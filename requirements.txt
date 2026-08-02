@@ -1,0 +1,5 @@
+requests
+openpyxl
+playwright
+pytesseract
+pillow
