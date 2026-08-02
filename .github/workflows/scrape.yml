@@ -26,4 +26,4 @@ jobs:
           git config user.email "bot@promoradar"
           git add data.json
           git diff --cached --quiet || git commit -m "data update"
-          git push
+          git push || (git pull --rebase -X theirs origin main && git push)
