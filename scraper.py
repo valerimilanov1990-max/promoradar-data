@@ -27,14 +27,23 @@ def scrape_ebag():
     for pid in CFG.get("ebag_ids", []):
         try:
             r = requests.get(f"https://www.ebag.bg/x/{pid}", headers=UA, timeout=30)
-            m_name = re.search(r'og:title" content="([^"]+?)(?: - eBag.bg)?"', r.text)
+            if r.status_code != 200:
+                OUT["errors"].append(f"ebag/{pid}: HTTP {r.status_code}")
+                continue
+            # името: og:title в произволен ред на атрибутите, после <title>
+            m_name = (re.search(r'og:title["\']?\s+content=["\']([^"\']+)', r.text)
+                      or re.search(r'content=["\']([^"\']+)["\']\s+property=["\']og:title', r.text)
+                      or re.search(r"<title>([^<]+)</title>", r.text))
             m_price = PRICE_RE.search(r.text)
             if m_name and m_price:
+                name = re.sub(r"\s*-\s*eBag\.bg\s*$", "", m_name.group(1)).strip()
                 OUT["ebag"].append({
                     "id": str(pid),
-                    "name": m_name.group(1),
+                    "name": name,
                     "price": float(m_price.group(1).replace(",", ".")),
                 })
+            else:
+                OUT["errors"].append(f"ebag/{pid}: страницата се чете, но цена/име не се разпознават")
         except Exception as e:
             log_err(f"ebag/{pid}", e)
 
@@ -48,6 +57,9 @@ def scrape_text_offers():
     for store, url in pages:
         try:
             r = requests.get(url, headers=UA, timeout=30)
+            if r.status_code != 200:
+                OUT["errors"].append(f"offers/{store}: HTTP {r.status_code}")
+                continue
             text = re.sub(r"<[^>]+>", " ", r.text)
             text = re.sub(r"\s+", " ", text)
             for m in PRICE_RE.finditer(text):
@@ -71,6 +83,27 @@ def scrape_text_offers():
         if k not in seen:
             seen.add(k); ded.append(o)
     OUT["offers"] = ded[:300]
+
+# Нормализация на имената на веригите + филтър (архивът съдържа и аптеки)
+CHAIN_MAP = [("КАУФЛАНД", "Кауфланд"), ("KAUFLAND", "Кауфланд"),
+             ("БИЛЛА", "Билла"), ("BILLA", "Билла"),
+             ("ЛИДЛ", "Лидл"), ("LIDL", "Лидл"),
+             ("МЕТРО", "Метро"), ("METRO", "Метро"),
+             ("ФАНТАСТИКО", "Фантастико"), ("Т МАРКЕТ", "T-Market"),
+             ("T MARKET", "T-Market"), ("CBA", "CBA"), ("БУЛМАГ", "BulMag")]
+SKIP_CHAIN = ("АПТЕКА", "ФАРМА", "ДРОГЕРИЯ", "PHARM")
+
+def norm_chain(raw):
+    up = raw.upper()
+    if any(k in up for k in SKIP_CHAIN):
+        return None  # не е хранителна верига
+    for key, nice in CHAIN_MAP:
+        if key in up:
+            return nice
+    # непозната верига: чистим служебните суфикси и съкращаваме
+    import re as _re
+    clean = _re.sub(r"_\d+$", "", raw).strip()
+    return clean[:30] if clean else None
 
 # ---------- 3. kolkostruva.bg: основните стоки ----------
 def scrape_basics():
@@ -112,8 +145,9 @@ def scrape_basics():
                                 price = float(re.sub(r"[^\d.]", "",
                                               row[cc].replace(",", ".")))
                                 nmv = row[pc].strip()
-                                if nmv and 0 < price < 1000:
-                                    rows.append({"chain": chain, "product": nmv, "price": price})
+                                ch = norm_chain(chain)
+                                if ch and nmv and 0 < price < 1000:
+                                    rows.append({"chain": ch, "product": nmv, "price": price})
                             except Exception:
                                 pass
                     elif low.endswith((".xlsx", ".xls")):
@@ -133,8 +167,9 @@ def scrape_basics():
                             try:
                                 price = float(str(row[cc]).replace(",", "."))
                                 nmv = str(row[pc] or "").strip()
-                                if nmv and 0 < price < 1000:
-                                    rows.append({"chain": chain, "product": nmv, "price": price})
+                                ch = norm_chain(chain)
+                                if ch and nmv and 0 < price < 1000:
+                                    rows.append({"chain": ch, "product": nmv, "price": price})
                             except Exception:
                                 pass
                 except Exception as e:
