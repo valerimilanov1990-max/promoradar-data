@@ -144,6 +144,49 @@ def unit_price(price, name):
     return round(up + 1e-9, 2), f"лв/{label}"
 
 
+EUR_RATE = 1.95583   # фиксираният курс лев/евро
+
+
+def collapse_currency(prices, curs=None, pct=None):
+    """Маха дублиращите се цени, изписани в другата валута.
+
+    След приемането на еврото магазините показват ЕДНА цена два пъти:
+    „29.99 €“ и „58.66 лв“. Ако ги подадем нататък като две числа, кодът
+    ги взима за цена и стара цена и обявява фалшиво намаление от 49%.
+    Точно това се случи с офертите на Кауфланд.
+
+    Разпознаваме двойките по съотношението 1.9558 и пазим левовата.
+    """
+    if not prices:
+        return []
+    curs = list(curs or [""] * len(prices))
+    if len(curs) < len(prices):
+        curs += [""] * (len(prices) - len(curs))
+
+    # Ако на плочката пише намаление около 49%, то може и да е истинско —
+    # тогава не пипаме нищо, за да не изтрием реална стара цена.
+    if pct and 46 <= pct <= 52:
+        return list(prices)
+
+    pairs = list(zip(prices, curs))
+    kept = []
+    for v, c in pairs:
+        if v <= 0:
+            continue
+        twin = any(o > v and abs(o / v - EUR_RATE) < 0.02 * EUR_RATE
+                   for o, _ in pairs)
+        if twin and c != "bgn":
+            continue          # v е същата цена, но в евро — махаме я
+        kept.append((v, c))
+
+    if not kept:
+        return list(prices)
+    # Ако накрая всичко е в евро, превръщаме в лева
+    if all(c == "eur" for _, c in kept):
+        return [round(v * EUR_RATE, 2) for v, _ in kept]
+    return [v for v, _ in kept]
+
+
 def pick_price_pair(prices, pct=None):
     """Избира (текуща цена, стара цена) измежду намерените на плочката числа.
 
@@ -263,70 +306,94 @@ def scrape_ebag(ctx):
 # ---------------------------------------------------------------------------
 # 2. Оферти от рендирания сайт (без OCR)
 # ---------------------------------------------------------------------------
-GRID_JS = """
-() => {
-  // ------------------------------------------------------------------
-  // Самонастройващо се извличане.
-  //
-  // Вместо да гадаем как изглежда плочката на всяка верига, откриваме я:
-  // продуктите в един списък са ЕДНАКВИ елементи, повторени много пъти.
-  // Търсим class-подписа, който се повтаря най-много и чиито елементи
-  // съдържат цена. Това е продуктовата решетка, каквато и да е разметката.
-  // ------------------------------------------------------------------
-  const PRICE_G = /(\\d{1,4}[.,]\\d{2})/g;
-  const PRICE_T = /\\d{1,4}[.,]\\d{2}/;
+# --- ОБЩИ ПОМОЩНИЦИ ЗА ДВАТА МЕТОДА -----------------------------------
+# Кауфланд мина по резервния метод, който нямаше поправките за имената и
+# цените — затова логиката вече е ЕДНА и се вгражда и в двата.
+JS_HELPERS = r"""
+  const PRICE_G = /(\d{1,4}[.,]\d{2})/g;
+  const PRICE_T = /\d{1,4}[.,]\d{2}/;
 
-  const sig = (el) => {
-    const cls = (typeof el.className === 'string' ? el.className : '').trim();
-    const parts = cls ? cls.split(/\\s+/).filter(c => c.length > 1 &&
-                        !/\\d{3,}/.test(c)).slice(0, 3).sort().join('.') : '';
-    return el.tagName + (parts ? '.' + parts : '');
+  // Редове като „цена за кг: 9.95“ са единични цени, не цената на продукта.
+  const isUnitLine = (l) => /цена\s*за|\/\s*(кг|kg|л|l|бр|100\s*(г|мл))|за\s+\d+\s*(г|мл|kg|кг)\b/i.test(l);
+
+  // След числото стои мярка -> това е ОБЕМ/ТЕГЛО, не цена („Мартини 0,75 л“).
+  const UNIT_AFTER = /^\s*(л\b|l\b|кг|kg|гр|г\b|g\b|мл|ml|бр|броя|%|["“”]|x|х|см|cm|мм|mm|м\b|m\b|вт|w\b|kw|квт)/i;
+  const CUR = /(лв|лева|bgn|€|eur)/i;
+  const EURO = /€|eur/i;
+  const LEVA = /лв|лева|bgn/i;
+
+  // Връща [{v: число, c: 'eur'|'bgn'|''}] — валутата е нужна, защото
+  // магазините изписват ЕДНАТА цена два пъти: в евро и в лева.
+  const readPrices = (text, strict) => {
+    const res = [];
+    let m;
+    PRICE_G.lastIndex = 0;
+    while ((m = PRICE_G.exec(text)) !== null) {
+      const end = m.index + m[0].length;
+      const after = text.slice(end, end + 10);
+      const before = text.slice(Math.max(0, m.index - 14), m.index);
+      if (UNIT_AFTER.test(after)) continue;
+      if (/\d$/.test(text.charAt(m.index - 1))) continue;
+      const hasCur = CUR.test(after) || CUR.test(before);
+      if (strict && !hasCur) continue;
+      let c = '';
+      if (EURO.test(after) || EURO.test(before)) c = 'eur';
+      else if (LEVA.test(after) || LEVA.test(before)) c = 'bgn';
+      res.push({v: parseFloat(m[1].replace(',', '.')), c: c});
+    }
+    return res;
   };
 
-  // 1) кандидати: елементи с цена в текста и с малко деца (близо до плочка)
-  const cands = [];
-  const all = document.querySelectorAll('div,li,article,section,a');
-  for (let i = 0; i < all.length; i++) {
-    const el = all[i];
-    if (el.children.length > 12) continue;
-    const t = el.textContent || '';
-    if (t.length < 4 || t.length > 400) continue;
-    if (!PRICE_T.test(t)) continue;
-    cands.push(el);
-  }
-
-  // 2) броим повтарящите се подписи нагоре по дървото
-  const groups = new Map();
-  for (const el of cands) {
-    let cur = el;
-    for (let d = 0; d < 5 && cur && cur !== document.body; d++) {
-      const s = sig(cur);
-      if (s.length > 3) {
-        if (!groups.has(s)) groups.set(s, new Set());
-        groups.get(s).add(cur);
-      }
-      cur = cur.parentElement;
+  const pricesOf = (el, wholeText) => {
+    let ms = [];
+    const priceEls = el.querySelectorAll(
+      '[class*="price" i],[class*="cena" i],[class*="Preis" i],[itemprop="price"]');
+    if (priceEls.length) {
+      let ptxt = '';
+      priceEls.forEach(p => { ptxt += '\n' + (p.textContent || ''); });
+      ms = readPrices(ptxt.split('\n').filter(l => !isUnitLine(l)).join('\n'), false);
     }
-  }
-
-  // 3) най-добрата група: много елементи, къс текст, има картинки
-  let best = null, bestScore = 0, bestSig = '';
-  for (const [s, set] of groups) {
-    const els = Array.from(set);
-    if (els.length < 6) continue;
-    let sum = 0, imgs = 0;
-    for (const e of els) {
-      sum += (e.textContent || '').length;
-      if (e.querySelector('img,source')) imgs++;
+    if (!ms.length) {
+      const lines = wholeText.split('\n').filter(l => !isUnitLine(l)).join('\n');
+      ms = readPrices(lines, true);
+      if (!ms.length) ms = readPrices(lines, false);
     }
-    const avg = sum / els.length;
-    if (avg > 400) continue;
-    const score = els.length * (avg < 220 ? 2 : 1) * (imgs > els.length / 2 ? 2 : 1);
-    if (score > bestScore) { bestScore = score; best = els; bestSig = s; }
-  }
-  if (!best) return {items: [], sig: '', n: 0};
+    return ms;
+  };
 
-  // 4) вадим данните от всеки елемент на решетката
+  // alt текстове, които описват СНИМКАТА, а не продукта
+  const ALT_PREFIX = /^\s*(изображение на|снимка на|картинка на|image of|photo of|picture of)\s*/i;
+  const looksLikeDescription = (s) => {
+    const words = s.split(/\s+/).filter(Boolean).length;
+    if (words > 10) return true;
+    if (/[.!?]$/.test(s.trim())) return true;
+    return false;
+  };
+
+  const nameOf = (el) => {
+    const t = el.querySelector(
+      '[class*="title" i],[class*="name" i],[class*="titel" i],h2,h3,h4,h5');
+    if (t) {
+      const s = (t.textContent || '').replace(/\s+/g, ' ').trim();
+      if (s.length > 2 && s.length < 140 && !/^[\d.,\s%€лв\-–—]+$/i.test(s)) return s;
+    }
+    const img = el.querySelector('img');
+    if (img && img.alt) {
+      const a = img.alt.replace(ALT_PREFIX, '').replace(/\s+/g, ' ').trim();
+      if (a.length > 2 && a.length < 140 && !looksLikeDescription(a)) return a;
+    }
+    const lines = (el.innerText || el.textContent || '')
+      .split('\n').map(s => s.trim())
+      .filter(s => s.length > 3 && s.length < 140 &&
+                   !/^[\d.,\s%€лвkg\-–—]+$/i.test(s) && !isUnitLine(s));
+    let bestLine = '';
+    for (const l of lines) {
+      if (looksLikeDescription(l)) continue;
+      if (l.length > bestLine.length) bestLine = l;
+    }
+    return bestLine;
+  };
+
   const imgOf = (el) => {
     const img = el.querySelector('img');
     if (img) {
@@ -345,147 +412,100 @@ GRID_JS = """
     return null;
   };
 
-  // Редове като „цена за кг: 9.95“ или „1.20 лв/100г“ са единични цени,
-  // а не цената на продукта. Ако ги смесим, „старата цена“ излиза грешна.
-  const isUnitLine = (l) => /цена\\s*за|\\/\\s*(кг|kg|л|l|бр|100\\s*(г|мл))|за\\s+\\d+\\s*(г|мл|kg|кг)\\b/i.test(l);
-
-  // След числото стои мерна единица -> това е ОБЕМ или ТЕГЛО, не цена.
-  // Точно тук се чупеше: „Мартини 0,75 л“ ставаше цена 0.75 лв.
-  const UNIT_AFTER = /^\\s*(л\\b|l\\b|кг|kg|гр|г\\b|g\\b|мл|ml|бр|броя|%|["“”]|x|х|см|cm|мм|mm|м\\b|m\\b|вт|w\\b|kw|квт)/i;
-  const CUR = /(лв|лева|bgn|€|eur)/i;
-
-  const readPrices = (text, strict) => {
-    const res = [];
-    let m;
-    PRICE_G.lastIndex = 0;
-    while ((m = PRICE_G.exec(text)) !== null) {
-      const end = m.index + m[0].length;
-      const after = text.slice(end, end + 10);
-      const before = text.slice(Math.max(0, m.index - 14), m.index);
-      if (UNIT_AFTER.test(after)) continue;             // 0,75 л -> обем
-      if (/\\d$/.test(text.charAt(m.index - 1))) continue; // част от по-дълго число
-      if (strict && !CUR.test(after) && !CUR.test(before)) continue;
-      res.push(parseFloat(m[1].replace(',', '.')));
-    }
-    return res;
-  };
-
-  // Отхвърляме alt текстове, които описват СНИМКАТА, а не продукта.
-  const ALT_PREFIX = /^\\s*(изображение на|снимка на|картинка на|image of|photo of|picture of)\\s*/i;
-  const looksLikeDescription = (s) => {
-    const words = s.split(/\\s+/).filter(Boolean).length;
-    if (words > 10) return true;               // „Жена в розова рокля седи на…“
-    if (/[.!?]$/.test(s.trim())) return true;  // цяло изречение
-    return false;
-  };
-
-  const nameOf = (el) => {
-    // 1) заглавен елемент — най-надеждният източник
-    const t = el.querySelector(
-      '[class*="title" i],[class*="name" i],[class*="titel" i],h2,h3,h4,h5');
-    if (t) {
-      const s = (t.textContent || '').replace(/\\s+/g, ' ').trim();
-      if (s.length > 2 && s.length < 140 && !/^[\\d.,\\s%€лв\\-–—]+$/i.test(s)) return s;
-    }
-    // 2) alt на снимката, но само ако прилича на име, не на описание
-    const img = el.querySelector('img');
-    if (img && img.alt) {
-      let a = img.alt.replace(ALT_PREFIX, '').replace(/\\s+/g, ' ').trim();
-      if (a.length > 2 && a.length < 140 && !looksLikeDescription(a)) return a;
-    }
-    // 3) най-подходящият ред от текста
-    const lines = (el.innerText || el.textContent || '')
-      .split('\\n').map(s => s.trim())
-      .filter(s => s.length > 3 && s.length < 140 &&
-                   !/^[\\d.,\\s%€лвkg\\-–—]+$/i.test(s) && !isUnitLine(s));
-    let bestLine = '';
-    for (const l of lines) {
-      if (looksLikeDescription(l)) continue;
-      if (l.length > bestLine.length) bestLine = l;
-    }
-    return bestLine;
-  };
-
-  const out = [], seen = new Set();
-  for (const el of best) {
-    const t = (el.innerText || el.textContent || '').trim();
-
-    // Цените: първо от елементите, които са ЯВНО цена (клас price/цена).
-    let ms = [];
-    const priceEls = el.querySelectorAll(
-      '[class*="price" i],[class*="cena" i],[class*="Preis" i],[itemprop="price"]');
-    if (priceEls.length) {
-      let ptxt = '';
-      priceEls.forEach(p => { ptxt += '\\n' + (p.textContent || ''); });
-      ms = readPrices(ptxt.split('\\n').filter(l => !isUnitLine(l)).join('\\n'), false);
-    }
-    // Ако няма такива елементи — четем текста, но искаме валутен знак
-    if (!ms.length) {
-      const lines = t.split('\\n').filter(l => !isUnitLine(l)).join('\\n');
-      ms = readPrices(lines, true);
-      if (!ms.length) ms = readPrices(lines, false);
-    }
-    if (!ms.length) continue;
-
-    let name = (nameOf(el) || '').replace(/\\s+/g, ' ').trim();
-    if (!name || name.length < 3) continue;
-
-    const im = imgOf(el);
-    const a = el.tagName === 'A' ? el : (el.querySelector('a') || el.closest('a'));
-    const key = name.toLowerCase().slice(0, 60) + '|' + Math.min.apply(null, ms);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    // процентът намаление, ако е изписан на плочката
-    let pct = null;
-    const pm = t.match(/-\\s?(\\d{1,2})\\s?%/);
-    if (pm) pct = parseInt(pm[1], 10);
-
-    out.push({name: name, prices: ms, pct: pct,
-              img: im ? im.src : '',
-              url: a ? (a.href || '') : ''});
-  }
-  return {items: out, sig: bestSig, n: best.length};
-}
-"""
-
-TILE_JS = """
-() => {
-  const out = [], seen = new Set();
-  const PRICE = /(\\d{1,3}[.,]\\d{2})/g;
-
-  // Картинката: съвременните сайтове зареждат лениво, затова гледаме и
-  // data-src / srcset / <source>, не само src.
-  const imgOf = (el) => {
-    const img = el.querySelector('img');
-    if (img) {
-      const direct = img.currentSrc || img.src || img.getAttribute('data-src')
-                  || img.getAttribute('data-original') || '';
-      const alt = (img.alt || '').trim();
-      if (direct && direct.indexOf('data:') !== 0) return {src: direct, alt: alt};
-      const ss = img.getAttribute('data-srcset') || img.getAttribute('srcset') || '';
-      if (ss) return {src: ss.split(',')[0].trim().split(' ')[0], alt: alt};
-      if (direct) return {src: direct, alt: alt};
-    }
-    const s = el.querySelector('source');
-    if (s) {
-      const ss = s.getAttribute('srcset') || '';
-      if (ss) return {src: ss.split(',')[0].trim().split(' ')[0], alt: ''};
-    }
-    return null;
-  };
-
   const linkOf = (el) => {
     const a = el.tagName === 'A' ? el : (el.querySelector('a') || el.closest('a'));
     return a ? (a.href || '') : '';
   };
 
-  // Кандидати: линкове с картинка + типични продуктови контейнери.
-  // Само <a> не стига — доста вериги слагат плочката в <div> или <article>.
-  // „Има картинка“ значи <img> ИЛИ <picture>/<source> — доста вериги
-  // сервират WebP през <picture> и вътре няма никакъв <img>.
-  const hasImage = (el) => !!(el.querySelector('img') || el.querySelector('source'));
+  const pctOf = (txt) => {
+    const pm = txt.match(/-\s?(\d{1,2})\s?%/);
+    return pm ? parseInt(pm[1], 10) : null;
+  };
 
+  const buildItem = (el) => {
+    const t = (el.innerText || el.textContent || '').trim();
+    const ms = pricesOf(el, t);
+    if (!ms.length) return null;
+    const name = (nameOf(el) || '').replace(/\s+/g, ' ').trim();
+    if (!name || name.length < 3) return null;
+    const im = imgOf(el);
+    return {name: name,
+            prices: ms.map(x => x.v),
+            cur: ms.map(x => x.c),
+            pct: pctOf(t),
+            img: im ? im.src : '',
+            url: linkOf(el)};
+  };
+"""
+
+# --- 1) Самонастройващо се откриване на продуктовата решетка ------------
+GRID_JS = "() => {" + JS_HELPERS + r"""
+  // Продуктите в един списък са ЕДНАКВИ елементи, повторени много пъти.
+  // Търсим class-подписа с най-много повторения, чиито елементи съдържат
+  // цена — това е решетката, каквато и да е разметката.
+  const sig = (el) => {
+    const cls = (typeof el.className === 'string' ? el.className : '').trim();
+    const parts = cls ? cls.split(/\s+/).filter(c => c.length > 1 &&
+                        !/\d{3,}/.test(c)).slice(0, 3).sort().join('.') : '';
+    return el.tagName + (parts ? '.' + parts : '');
+  };
+
+  const cands = [];
+  const all = document.querySelectorAll('div,li,article,section,a');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (el.children.length > 12) continue;
+    const t = el.textContent || '';
+    if (t.length < 4 || t.length > 400) continue;
+    if (!PRICE_T.test(t)) continue;
+    cands.push(el);
+  }
+
+  const groups = new Map();
+  for (const el of cands) {
+    let cur = el;
+    for (let d = 0; d < 5 && cur && cur !== document.body; d++) {
+      const s = sig(cur);
+      if (s.length > 3) {
+        if (!groups.has(s)) groups.set(s, new Set());
+        groups.get(s).add(cur);
+      }
+      cur = cur.parentElement;
+    }
+  }
+
+  let best = null, bestScore = 0, bestSig = '';
+  for (const [s, set] of groups) {
+    const els = Array.from(set);
+    if (els.length < 6) continue;
+    let sum = 0, imgs = 0;
+    for (const e of els) {
+      sum += (e.textContent || '').length;
+      if (e.querySelector('img,source')) imgs++;
+    }
+    const avg = sum / els.length;
+    if (avg > 400) continue;
+    const score = els.length * (avg < 220 ? 2 : 1) * (imgs > els.length / 2 ? 2 : 1);
+    if (score > bestScore) { bestScore = score; best = els; bestSig = s; }
+  }
+  if (!best) return {items: [], sig: '', n: 0};
+
+  const out = [], seen = new Set();
+  for (const el of best) {
+    const it = buildItem(el);
+    if (!it) continue;
+    const key = it.name.toLowerCase().slice(0, 60) + '|' + Math.min.apply(null, it.prices);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return {items: out, sig: bestSig, n: best.length};
+}
+"""
+
+# --- 2) Резервен метод: по плочки --------------------------------------
+TILE_JS = "() => {" + JS_HELPERS + r"""
+  const hasImage = (el) => !!(el.querySelector('img') || el.querySelector('source'));
   const cands = new Set();
   document.querySelectorAll('a').forEach(a => { if (hasImage(a)) cands.add(a); });
   document.querySelectorAll(
@@ -494,30 +514,18 @@ TILE_JS = """
     'article,li'
   ).forEach(el => {
     const t = el.innerText || '';
-    // дълъг текст = това е контейнер с много продукти, не единична плочка
     if (hasImage(el) && t.length > 0 && t.length < 400) cands.add(el);
   });
 
+  const out = [], seen = new Set();
   cands.forEach(el => {
-    const t = (el.innerText || '').trim();
-    if (!t) return;
-    const ms = [...t.matchAll(PRICE)].map(x => parseFloat(x[1].replace(',', '.')));
-    if (!ms.length) return;
-    if (ms.length > 5) return;              // повече от 5 цени = групов контейнер
-    const im = imgOf(el);
-    let name = (im && im.alt) ? im.alt : '';
-    if (!name) {
-      const line = t.split('\\n').map(s => s.trim())
-                    .find(s => s.length > 4 && !/^[\\d.,\\s€лвimg%-]+$/i.test(s));
-      name = line || '';
-    }
-    if (!name) return;
-    const key = name.toLowerCase().slice(0, 60) + '|' + Math.min.apply(null, ms);
+    const it = buildItem(el);
+    if (!it) return;
+    if (it.prices.length > 5) return;      // групов контейнер, не плочка
+    const key = it.name.toLowerCase().slice(0, 60) + '|' + Math.min.apply(null, it.prices);
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({name: name, prices: ms,
-              img: im ? im.src : '',
-              url: linkOf(el)});
+    out.push(it);
   });
   return out;
 }
@@ -646,7 +654,26 @@ def _harvest(ctx, store, url, keywords=()):
     found, extra_links = [], []
     try:
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
-        pg.wait_for_timeout(5000)
+        pg.wait_for_timeout(3000)
+
+        # Защитен екран („Един момент…“, „Checking your browser“) — сайтът
+        # още не е зареден. Изчакваме проверката да мине, вместо да четем
+        # междинната страница и да отчетем 0 продукта.
+        for _ in range(12):
+            try:
+                txt = (pg.inner_text("body") or "")
+                title = (pg.title() or "")
+            except Exception:
+                break
+            waiting = (len(txt) < 600 or
+                       re.search(r"един момент|checking your browser|just a moment|"
+                                 r"проверка на браузъра|attention required",
+                                 txt + " " + title, re.IGNORECASE))
+            if not waiting:
+                break
+            pg.wait_for_timeout(2500)
+
+        pg.wait_for_timeout(1500)
         # --- Дозареждане: скролваме и натискаме „покажи още“, докато расте ---
         last, stale = -1, 0
         for _ in range(LOAD_MORE_ROUNDS):
@@ -734,7 +761,10 @@ def _harvest(ctx, store, url, keywords=()):
                 note(f"dom/{store}", f"0 плочки на {url[:60]} (и диагностиката не мина)")
 
         for it in items:
-            prices = [x for x in it.get("prices", []) if 0.1 <= x <= 1000]
+            # първо махаме дублите в другата валута, после избираме двойката
+            prices = collapse_currency(it.get("prices", []),
+                                       it.get("cur"), it.get("pct"))
+            prices = [x for x in prices if 0.1 <= x <= 5000]
             if not prices:
                 continue
             name = re.sub(r"\s+", " ", it.get("name") or "").strip()
@@ -844,7 +874,13 @@ CHAIN_MAP = [
 # Аптеките отпадат — там се продават лекарства, не хранителни стоки.
 # Дрогериите (Lilly, dm) ОСТАВАТ: там има перилни, козметика и битова химия,
 # които влизат в кошницата. Конкуренцията ги показва и с право.
-SKIP_CHAIN = ("АПТЕКА", "APTEKA", "ФАРМА", "PHARM", "ЛЕКАРСТВ", "ЗДРАВНА КАСА")
+# „АПТЕК“ без окончание — иначе „АПТЕКИ ГАЛЕН“ се промъква покрай „АПТЕКА“.
+SKIP_CHAIN = ("АПТЕК", "APTEK", "ФАРМА", "PHARM", "ЛЕКАРСТВ", "ЗДРАВНА КАСА",
+              "ОПТИК", "ЗООМАГ",
+              # бензиностанции: продават храна, но цените им не са
+              # представителни за пазаруване и само шумят в класацията
+              "БЕНЗИНОСТ", "ПЕТРОЛ", "PETROL", "ЛУКОЙЛ", "LUKOIL",
+              "ШЕЛ", "SHELL", "ОМВ", "OMV", "ЕКО БЪЛГАРИЯ", "ROMPETROL")
 
 
 def _key_hit(up, key):
@@ -962,8 +998,21 @@ def scrape_basics():
                 except Exception as e:
                     log_err(f"basics/{nm[:40]}", e)
             if rows:
-                OUT["basics"] = rows[:12000]
+                # ВАЖНО: не режем сляпо първите N реда. Досега първата верига
+                # по азбучен ред („Аванти“) изяждаше целия лимит и в изхода
+                # оставаха 3 вериги от 27. Сега всяка получава свой дял.
+                per_chain = int(CFG.get("max_basics_per_chain", 2500))
+                total_cap = int(CFG.get("max_basics_total", 25000))
+                buckets = {}
+                for r in rows:
+                    buckets.setdefault(r["chain"], []).append(r)
+                picked = []
+                for ch, lst in sorted(buckets.items(), key=lambda kv: -len(kv[1])):
+                    picked.extend(lst[:per_chain])
+                OUT["basics"] = picked[:total_cap]
                 OUT["basics_date"] = d
+                OUT["stats"]["basics_налични_вериги"] = len(buckets)
+                OUT["stats"]["basics_редове_преди_лимита"] = len(rows)
                 chains = sorted({r["chain"] for r in OUT["basics"]})
                 OUT["stats"]["basics"] = f"{len(OUT['basics'])} реда, {len(chains)} вериги"
                 OUT["stats"]["basics_chains"] = chains

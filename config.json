@@ -1,7 +1,14 @@
 {
-  "ebag_ids": [616792, 646292, 600082],
-  "keywords": ["пинса", "омар", "уагю"],
-
+  "ebag_ids": [
+    616792,
+    646292,
+    600082
+  ],
+  "keywords": [
+    "пинса",
+    "омар",
+    "уагю"
+  ],
   "_1_настройки": "Промяната им НЕ иска промяна в кода.",
   "time_budget_min": 45,
   "max_pages": 20,
@@ -15,7 +22,6 @@
     "След първото пускане виж 'време общо' в stats и вдигни max_pages,",
     "ако е свършил рано."
   ],
-
   "_2_магазини": [
     "Добавяне на верига = добавяш блок тук. Няма нужда от промяна в кода.",
     "urls    = откъде да започне обхождането",
@@ -25,7 +31,6 @@
     "след първото пускане виж 'errors' в data.json: там пише коя страница е",
     "върнала 0 продукта и защо, и се коригира само адресът тук."
   ],
-
   "stores": [
     {
       "name": "Кауфланд",
@@ -34,56 +39,130 @@
         "https://www.kaufland.bg/aktualni-predlozheniya/ot-ponedelnik.html",
         "https://www.kaufland.bg/aktualni-predlozheniya/oferti.html"
       ],
-      "keywords": ["aktualni-predlozheniya", "oferti", "ot-ponedelnik", "ot-chetvartak"]
+      "keywords": [
+        "aktualni-predlozheniya",
+        "oferti",
+        "ot-ponedelnik",
+        "ot-chetvartak"
+      ]
     },
     {
       "name": "Лидл",
       "enabled": true,
-      "urls": ["https://www.lidl.bg/"],
-      "keywords": ["aktsiya", "oferti", "predlozheni", "top-", "/c/"]
+      "urls": [
+        "https://www.lidl.bg/"
+      ],
+      "keywords": [
+        "aktsiya",
+        "oferti",
+        "predlozheni",
+        "top-",
+        "/c/"
+      ]
     },
     {
       "name": "Метро",
-      "enabled": true,
-      "urls": ["https://www.metro.bg/oferti/top-oferti", "https://www.metro.bg/"],
-      "keywords": ["oferti", "promo", "katalog"]
+      "enabled": false,
+      "urls": [
+        "https://www.metro.bg/oferti/top-oferti"
+      ],
+      "keywords": [
+        "oferti",
+        "promo",
+        "katalog"
+      ],
+      "_": "Изключен: metro.bg връща 403 на автоматизиран браузър."
     },
     {
       "name": "Билла",
       "enabled": true,
-      "urls": ["https://www.billa.bg/promocii"],
-      "keywords": ["promocii", "promo", "oferti", "katalog"]
+      "urls": [
+        "https://www.billa.bg/promocii"
+      ],
+      "keywords": [
+        "promocii",
+        "promo",
+        "oferti",
+        "katalog"
+      ]
     },
-
     {
+      "_": "Фантастико и T-Market имат защитен екран 'Един момент…'. Скриптът",
+      "__": "вече го изчаква. Ако пак дадат 0, значи блокират автоматизацията.",
       "name": "Фантастико",
       "enabled": true,
-      "urls": ["https://fantastico.bg/promo", "https://fantastico.bg/"],
-      "keywords": ["promo", "oferti", "broshura", "katalog"]
+      "urls": [
+        "https://fantastico.bg/",
+        "https://fantastico.bg/promo"
+      ],
+      "keywords": [
+        "promo",
+        "oferti",
+        "broshura",
+        "produkt",
+        "katalog"
+      ]
     },
     {
       "name": "T-Market",
       "enabled": true,
-      "urls": ["https://tmarket.bg/promocii", "https://tmarket.bg/"],
-      "keywords": ["promo", "oferti", "broshura", "katalog"]
+      "urls": [
+        "https://tmarket.bg/",
+        "https://tmarket.bg/promocii"
+      ],
+      "keywords": [
+        "promo",
+        "oferti",
+        "broshura",
+        "produkt",
+        "katalog"
+      ]
     },
     {
+      "_": "ПОПРАВЕНО: lilly.bg е фармацевтичната компания Eli Lilly, не дрогерията.",
       "name": "Lilly",
       "enabled": true,
-      "urls": ["https://lilly.bg/promocii", "https://lilly.bg/"],
-      "keywords": ["promo", "oferti", "broshura", "katalog"]
+      "urls": [
+        "https://lillydrogerie.bg/",
+        "https://lillydrogerie.bg/promocii"
+      ],
+      "keywords": [
+        "promo",
+        "oferti",
+        "produkt",
+        "katalog"
+      ]
     },
     {
+      "_": "ПОПРАВЕНО: dm.bg не съществува (ERR_NAME_NOT_RESOLVED).",
       "name": "dm",
       "enabled": true,
-      "urls": ["https://www.dm.bg/oferti", "https://www.dm.bg/"],
-      "keywords": ["oferti", "promo", "aktsii"]
+      "urls": [
+        "https://www.dm-drogeriemarkt.bg/",
+        "https://www.dm-drogeriemarkt.bg/oferti"
+      ],
+      "keywords": [
+        "oferti",
+        "promo",
+        "aktsii",
+        "produkt"
+      ]
     },
     {
+      "_": "Изключен: cba.bg/promocii дава 404, а началната страница няма",
+      "__": "продуктови плочки. Включи го, ако намериш работещ адрес.",
       "name": "CBA",
-      "enabled": true,
-      "urls": ["https://cba.bg/promocii", "https://cba.bg/"],
-      "keywords": ["promo", "oferti", "broshura"]
+      "enabled": false,
+      "urls": [
+        "https://cba.bg/"
+      ],
+      "keywords": [
+        "promo",
+        "oferti",
+        "broshura"
+      ]
     }
-  ]
+  ],
+  "max_basics_per_chain": 2500,
+  "max_basics_total": 25000
 }
