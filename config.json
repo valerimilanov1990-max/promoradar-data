@@ -57,7 +57,7 @@
         "oferti",
         "predlozheni",
         "top-",
-        "/c/"
+        "promo"
       ]
     },
     {
@@ -75,7 +75,7 @@
     },
     {
       "name": "Билла",
-      "enabled": true,
+      "enabled": false,
       "urls": [
         "https://www.billa.bg/promocii"
       ],
@@ -84,13 +84,14 @@
         "promo",
         "oferti",
         "katalog"
-      ]
+      ],
+      "_": "billa.bg/promocii е брошура-картинка, без плочки. Цените идват от КЗП."
     },
     {
-      "_": "Фантастико и T-Market имат защитен екран 'Един момент…'. Скриптът",
+      "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване.",
       "__": "вече го изчаква. Ако пак дадат 0, значи блокират автоматизацията.",
       "name": "Фантастико",
-      "enabled": true,
+      "enabled": false,
       "urls": [
         "https://fantastico.bg/",
         "https://fantastico.bg/promo"
@@ -105,7 +106,7 @@
     },
     {
       "name": "T-Market",
-      "enabled": true,
+      "enabled": false,
       "urls": [
         "https://tmarket.bg/",
         "https://tmarket.bg/promocii"
@@ -116,21 +117,22 @@
         "broshura",
         "produkt",
         "katalog"
-      ]
+      ],
+      "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване."
     },
     {
-      "_": "ПОПРАВЕНО: lilly.bg е фармацевтичната компания Eli Lilly, не дрогерията.",
+      "_": "Началната страница води към „Доставка и плащане“ — пробваме /products.",
       "name": "Lilly",
       "enabled": true,
       "urls": [
-        "https://lillydrogerie.bg/",
-        "https://lillydrogerie.bg/promocii"
+        "https://lillydrogerie.bg/products",
+        "https://lillydrogerie.bg/"
       ],
       "keywords": [
+        "product",
         "promo",
-        "oferti",
-        "produkt",
-        "katalog"
+        "katalog",
+        "kategoriya"
       ]
     },
     {
@@ -163,6 +165,6 @@
       ]
     }
   ],
-  "max_basics_per_chain": 2500,
-  "max_basics_total": 25000
+  "max_basics_per_chain": 1500,
+  "max_basics_total": 20000
 }

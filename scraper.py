@@ -219,7 +219,10 @@ def pick_price_pair(prices, pct=None):
             return best
 
     price = vals[0]
-    old = next((v for v in vals[1:] if v > price * 1.02), None)
+    # Старата цена е най-близката над текущата, но НЕ повече от 5 пъти:
+    # съотношение 10 или 20 значи, че сме хванали цена за 100 г или за
+    # кашон, а не истинско намаление от 95%.
+    old = next((v for v in vals[1:] if price * 1.02 < v <= price * 5), None)
     return price, old
 
 
@@ -336,27 +339,35 @@ JS_HELPERS = r"""
       if (/\d$/.test(text.charAt(m.index - 1))) continue;
       const hasCur = CUR.test(after) || CUR.test(before);
       if (strict && !hasCur) continue;
+      // Валутата се чете от ТЯСНО прозорче. Иначе символът от предишната
+      // цена („16.61 €“) попада в контекста на следващата („32.49 лв“) и
+      // двете излизат в евро — тогава кодът ги умножава по курса наново.
+      const near = after.slice(0, 6);
+      const pre  = before.slice(-3);
       let c = '';
-      if (EURO.test(after) || EURO.test(before)) c = 'eur';
-      else if (LEVA.test(after) || LEVA.test(before)) c = 'bgn';
+      if (LEVA.test(near)) c = 'bgn';
+      else if (EURO.test(near)) c = 'eur';
+      else if (EURO.test(pre)) c = 'eur';       // „€40.39“
+      else if (LEVA.test(pre)) c = 'bgn';
       res.push({v: parseFloat(m[1].replace(',', '.')), c: c});
     }
     return res;
   };
 
   const pricesOf = (el, wholeText) => {
-    let ms = [];
-    const priceEls = el.querySelectorAll(
-      '[class*="price" i],[class*="cena" i],[class*="Preis" i],[itemprop="price"]');
-    if (priceEls.length) {
+    // ВАЖНО: четем от ЦЕЛИЯ текст на плочката, не от изолирания елемент с
+    // клас „price“. Само там мярката стои непосредствено до числото и
+    // „0,75 л“ се разпознава като обем, а не като цена от 75 стотинки.
+    const lines = wholeText.split('\n').filter(l => !isUnitLine(l)).join('\n');
+    let ms = readPrices(lines, true);      // първо с валутен знак наблизо
+    if (!ms.length) ms = readPrices(lines, false);
+    if (!ms.length) {
+      // краен случай: плочката няма никакъв текст с цена наоколо
+      const priceEls = el.querySelectorAll(
+        '[class*="price" i],[class*="cena" i],[class*="Preis" i],[itemprop="price"]');
       let ptxt = '';
       priceEls.forEach(p => { ptxt += '\n' + (p.textContent || ''); });
       ms = readPrices(ptxt.split('\n').filter(l => !isUnitLine(l)).join('\n'), false);
-    }
-    if (!ms.length) {
-      const lines = wholeText.split('\n').filter(l => !isUnitLine(l)).join('\n');
-      ms = readPrices(lines, true);
-      if (!ms.length) ms = readPrices(lines, false);
     }
     return ms;
   };
@@ -370,28 +381,38 @@ JS_HELPERS = r"""
     return false;
   };
 
+  // „rating.starFilled“, „product_title“ — вътрешни ключове на сайта,
+  // изтекли в текста. Човешко име винаги има интервал или кирилица.
+  const looksLikeCode = (s) => {
+    if (/[А-Яа-я]/.test(s)) return false;
+    if (/\s/.test(s)) return false;
+    return /[._]/.test(s) || /^[a-z]+[A-Z]/.test(s);
+  };
+
   const nameOf = (el) => {
-    const t = el.querySelector(
-      '[class*="title" i],[class*="name" i],[class*="titel" i],h2,h3,h4,h5');
-    if (t) {
-      const s = (t.textContent || '').replace(/\s+/g, ' ').trim();
-      if (s.length > 2 && s.length < 140 && !/^[\d.,\s%€лв\-–—]+$/i.test(s)) return s;
-    }
+    // Събираме ВСИЧКИ кандидати и взимаме най-информативния.
+    // Ако вземем първия заглавен елемент, за Кауфланд излиза само
+    // марката („Martini“) вместо цялото име на продукта.
+    const cands = [];
+    el.querySelectorAll('[class*="title" i],[class*="name" i],[class*="titel" i],h2,h3,h4,h5')
+      .forEach(t => cands.push((t.textContent || '').replace(/\s+/g, ' ').trim()));
     const img = el.querySelector('img');
     if (img && img.alt) {
-      const a = img.alt.replace(ALT_PREFIX, '').replace(/\s+/g, ' ').trim();
-      if (a.length > 2 && a.length < 140 && !looksLikeDescription(a)) return a;
+      cands.push(img.alt.replace(ALT_PREFIX, '').replace(/\s+/g, ' ').trim());
     }
-    const lines = (el.innerText || el.textContent || '')
-      .split('\n').map(s => s.trim())
-      .filter(s => s.length > 3 && s.length < 140 &&
-                   !/^[\d.,\s%€лвkg\-–—]+$/i.test(s) && !isUnitLine(s));
-    let bestLine = '';
-    for (const l of lines) {
-      if (looksLikeDescription(l)) continue;
-      if (l.length > bestLine.length) bestLine = l;
+    (el.innerText || el.textContent || '').split('\n')
+      .forEach(s => cands.push(s.replace(/\s+/g, ' ').trim()));
+
+    let best = '';
+    for (const s of cands) {
+      if (!s || s.length < 3 || s.length > 140) continue;
+      if (/^[\d.,\s%€лвkg\-–—]+$/i.test(s)) continue;   // само числа
+      if (isUnitLine(s)) continue;
+      if (looksLikeDescription(s)) continue;
+      if (looksLikeCode(s)) continue;
+      if (s.length > best.length) best = s;
     }
-    return bestLine;
+    return best;
   };
 
   const imgOf = (el) => {
@@ -659,7 +680,10 @@ def _harvest(ctx, store, url, keywords=()):
         # Защитен екран („Един момент…“, „Checking your browser“) — сайтът
         # още не е зареден. Изчакваме проверката да мине, вместо да четем
         # междинната страница и да отчетем 0 продукта.
-        for _ in range(12):
+        # 5 опита по 2.5 сек стигат за нормална проверка; ако сайтът не
+        # пусне дотогава, той просто блокира автоматизацията и чакането
+        # само изяжда бюджета (миналото пускане отиде 28 мин заради това).
+        for _ in range(5):
             try:
                 txt = (pg.inner_text("body") or "")
                 title = (pg.title() or "")
@@ -973,6 +997,68 @@ def _read_xlsx(blob, chain, rows):
             pass
 
 
+# Веригите, в които хората реално пазаруват. Те получават дял ПЪРВИ —
+# иначе се пълни с местни магазинчета и в приложението липсват Кауфланд
+# и Билла, което прави класацията на кошницата безполезна.
+PRIORITY_CHAINS = [
+    "Кауфланд", "Билла", "Лидл", "Метро", "Фантастико", "T-Market",
+    "BulMag", "dm", "Lilly", "CBA", "Аванти", "КООП", "Триумф",
+    "Промаркет", "Пикадили", "Жанет", "Березка", "Дар", "Лекси", "Класико",
+]
+
+
+def _select_basics(rows):
+    """Избира кои официални цени да влязат във фийда.
+
+    Архивът на КЗП е огромен — над милион реда от 131 вериги, защото
+    съдържа по един запис за всеки магазин на веригата. Два проблема:
+    файлът става непосилен, а сляпото рязане изхвърля точно големите вериги.
+
+    Затова: първо сливаме повторенията (една цена на продукт във верига,
+    най-ниската), после даваме дял първо на веригите, в които се пазарува.
+    """
+    per_chain = int(CFG.get("max_basics_per_chain", 1500))
+    total_cap = int(CFG.get("max_basics_total", 20000))
+
+    # 1) сливане: най-ниската цена за продукт във всяка верига
+    merged = {}
+    for r in rows:
+        key = (r["chain"], re.sub(r"\s+", " ", r["product"]).strip().lower()[:70])
+        cur = merged.get(key)
+        if cur is None or r["price"] < cur["price"]:
+            merged[key] = r
+
+    buckets = {}
+    for r in merged.values():
+        buckets.setdefault(r["chain"], []).append(r)
+
+    # 2) подредба: първо приоритетните, после останалите по големина
+    def rank(chain):
+        return (PRIORITY_CHAINS.index(chain) if chain in PRIORITY_CHAINS
+                else len(PRIORITY_CHAINS) + 1)
+
+    order = sorted(buckets.keys(), key=lambda c: (rank(c), -len(buckets[c])))
+
+    picked = []
+    for ch in order:
+        if len(picked) >= total_cap:
+            break
+        picked.extend(buckets[ch][:per_chain])
+
+    picked = picked[:total_cap]
+    got = sorted({r["chain"] for r in picked})
+    OUT["stats"]["basics_вериги_в_архива"] = len(buckets)
+    OUT["stats"]["basics_редове_в_архива"] = len(rows)
+    OUT["stats"]["basics_след_сливане"] = len(merged)
+    OUT["stats"]["basics"] = f"{len(picked)} реда, {len(got)} вериги"
+    OUT["stats"]["basics_chains"] = got
+    missing = [c for c in PRIORITY_CHAINS[:6] if c not in got]
+    if missing:
+        note("basics", f"липсват едри вериги: {', '.join(missing)} — "
+                       f"или не подават данни, или името им не се разпознава")
+    return picked
+
+
 def scrape_basics():
     base = CFG.get("food_base", "https://kolkostruva.bg/opendata_files/")
     day = datetime.date.today()
@@ -998,25 +1084,9 @@ def scrape_basics():
                 except Exception as e:
                     log_err(f"basics/{nm[:40]}", e)
             if rows:
-                # ВАЖНО: не режем сляпо първите N реда. Досега първата верига
-                # по азбучен ред („Аванти“) изяждаше целия лимит и в изхода
-                # оставаха 3 вериги от 27. Сега всяка получава свой дял.
-                per_chain = int(CFG.get("max_basics_per_chain", 2500))
-                total_cap = int(CFG.get("max_basics_total", 25000))
-                buckets = {}
-                for r in rows:
-                    buckets.setdefault(r["chain"], []).append(r)
-                picked = []
-                for ch, lst in sorted(buckets.items(), key=lambda kv: -len(kv[1])):
-                    picked.extend(lst[:per_chain])
-                OUT["basics"] = picked[:total_cap]
+                OUT["basics"] = _select_basics(rows)
                 OUT["basics_date"] = d
-                OUT["stats"]["basics_налични_вериги"] = len(buckets)
-                OUT["stats"]["basics_редове_преди_лимита"] = len(rows)
-                chains = sorted({r["chain"] for r in OUT["basics"]})
-                OUT["stats"]["basics"] = f"{len(OUT['basics'])} реда, {len(chains)} вериги"
-                OUT["stats"]["basics_chains"] = chains
-                OUT["stats"]["basics_skipped_files"] = skipped
+                OUT["stats"]["basics_пропуснати_файла"] = skipped
                 return
         except Exception as e:
             log_err(f"basics/{d}", e)
