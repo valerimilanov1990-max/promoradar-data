@@ -1,4 +1,89 @@
 {
   "ebag_ids": [616792, 646292, 600082],
-  "keywords": ["пинса", "омар", "уагю"]
+  "keywords": ["пинса", "омар", "уагю"],
+
+  "_1_настройки": "Промяната им НЕ иска промяна в кода.",
+  "time_budget_min": 45,
+  "max_pages": 20,
+  "max_per_store": 1500,
+  "load_more_rounds": 12,
+  "polite_ms": 400,
+  "_1_бележка": [
+    "time_budget_min е ГЛАВНИЯТ предпазител: щом изтече, скриптът спира",
+    "обхождането и записва каквото е събрал. Така никога не оставаш без",
+    "данни заради изтекло време. Времето се дели поравно между веригите.",
+    "След първото пускане виж 'време общо' в stats и вдигни max_pages,",
+    "ако е свършил рано."
+  ],
+
+  "_2_магазини": [
+    "Добавяне на верига = добавяш блок тук. Няма нужда от промяна в кода.",
+    "urls    = откъде да започне обхождането",
+    "keywords= думи в адресите, по които се разпознават още страници с оферти",
+    "enabled = сложи false, за да изключиш верига, без да я триеш",
+    "ПРОВЕРЕНИ са първите четири. Останалите са предположения за адресите —",
+    "след първото пускане виж 'errors' в data.json: там пише коя страница е",
+    "върнала 0 продукта и защо, и се коригира само адресът тук."
+  ],
+
+  "stores": [
+    {
+      "name": "Кауфланд",
+      "enabled": true,
+      "urls": [
+        "https://www.kaufland.bg/aktualni-predlozheniya/ot-ponedelnik.html",
+        "https://www.kaufland.bg/aktualni-predlozheniya/oferti.html"
+      ],
+      "keywords": ["aktualni-predlozheniya", "oferti", "ot-ponedelnik", "ot-chetvartak"]
+    },
+    {
+      "name": "Лидл",
+      "enabled": true,
+      "urls": ["https://www.lidl.bg/"],
+      "keywords": ["aktsiya", "oferti", "predlozheni", "top-", "/c/"]
+    },
+    {
+      "name": "Метро",
+      "enabled": true,
+      "urls": ["https://www.metro.bg/oferti/top-oferti", "https://www.metro.bg/"],
+      "keywords": ["oferti", "promo", "katalog"]
+    },
+    {
+      "name": "Билла",
+      "enabled": true,
+      "urls": ["https://www.billa.bg/promocii"],
+      "keywords": ["promocii", "promo", "oferti", "katalog"]
+    },
+
+    {
+      "name": "Фантастико",
+      "enabled": true,
+      "urls": ["https://fantastico.bg/promo", "https://fantastico.bg/"],
+      "keywords": ["promo", "oferti", "broshura", "katalog"]
+    },
+    {
+      "name": "T-Market",
+      "enabled": true,
+      "urls": ["https://tmarket.bg/promocii", "https://tmarket.bg/"],
+      "keywords": ["promo", "oferti", "broshura", "katalog"]
+    },
+    {
+      "name": "Lilly",
+      "enabled": true,
+      "urls": ["https://lilly.bg/promocii", "https://lilly.bg/"],
+      "keywords": ["promo", "oferti", "broshura", "katalog"]
+    },
+    {
+      "name": "dm",
+      "enabled": true,
+      "urls": ["https://www.dm.bg/oferti", "https://www.dm.bg/"],
+      "keywords": ["oferti", "promo", "aktsii"]
+    },
+    {
+      "name": "CBA",
+      "enabled": true,
+      "urls": ["https://cba.bg/promocii", "https://cba.bg/"],
+      "keywords": ["promo", "oferti", "broshura"]
+    }
+  ]
 }

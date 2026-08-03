@@ -2,7 +2,8 @@ name: Scrape
 on:
   schedule:
     - cron: "0 4 * * *"
-  workflow_dispatch: {}
+    - cron: "40 5 * * *"   # всяка сутрин 04:00 UTC (7:00 БГ)
+  workflow_dispatch: {}     # + ръчно пускане от бутона Run workflow
 permissions:
   contents: write
 jobs:
@@ -25,5 +26,5 @@ jobs:
           git config user.name "promo-radar-bot"
           git config user.email "bot@promoradar"
           git add data.json
-          git diff --cached --quiet || git commit -m "data update"
-          git push || (git pull --rebase -X theirs origin main && git push)
+          git diff --cached --quiet || git commit -m "data $(date +%F)"
+          git push
