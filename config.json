@@ -53,12 +53,14 @@
         "https://www.lidl.bg/"
       ],
       "keywords": [
+        "/c/",
         "aktsiya",
         "oferti",
         "predlozheni",
         "top-",
         "promo"
-      ]
+      ],
+      "_": "„/c/“ е нужно — без него Лидл дава 0. Ненужните страници се отсяват в кода."
     },
     {
       "name": "Метро",
@@ -121,9 +123,9 @@
       "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване."
     },
     {
-      "_": "Началната страница води към „Доставка и плащане“ — пробваме /products.",
+      "_": "Изключен: lillydrogerie.bg не дава продуктови плочки (0 от 11 страници). Цените идват от КЗП.",
       "name": "Lilly",
-      "enabled": true,
+      "enabled": false,
       "urls": [
         "https://lillydrogerie.bg/products",
         "https://lillydrogerie.bg/"

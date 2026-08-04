@@ -670,6 +670,22 @@ NEXT_JS = """
 """
 
 
+# Страници, които никога не съдържат продукти. Обхождането им само яде
+# време и пълни „errors“ — при Лидл 15 от 20 посетени страници бяха такива.
+SKIP_URL = ("zashchita-na-dannite", "obshti-uslovia", "uslovia", "privacy",
+            "cookie", "karier", "kariera", "rabota", "kontakt", "za-nas",
+            "polezno-info", "igra", "kupon", "coupid", "plus", "app",
+            "magazin-lokator", "lokator", "newsletter", "impressum")
+SKIP_TITLE = ("защита на данните", "общи условия", "поверителност", "бисквитк",
+              "кариер", "контакт", "за нас", "полезно инфо", "доставка и плащане",
+              "често задавани", "карта на сайта")
+
+
+def _useful_url(url):
+    low = url.lower()
+    return not any(k in low for k in SKIP_URL)
+
+
 def _harvest(ctx, store, url, keywords=()):
     pg = ctx.new_page()
     found, extra_links = [], []
@@ -722,6 +738,14 @@ def _harvest(ctx, store, url, keywords=()):
                 stale = 0
             last = now
 
+        # Страница с условия/кариери няма продукти — не си губим времето
+        try:
+            ttl = (pg.title() or "").lower()
+            if any(k in ttl for k in SKIP_TITLE):
+                return [], []
+        except Exception:
+            pass
+
         # 1) самонастройващо се откриване на продуктовата решетка
         items, used = [], ""
         try:
@@ -760,7 +784,7 @@ def _harvest(ctx, store, url, keywords=()):
                 links = pg.evaluate(
                     "() => [...document.querySelectorAll('a[href]')].map(a => a.href)")
                 for l in links:
-                    if host not in l or l in seen:
+                    if host not in l or l in seen or not _useful_url(l):
                         continue
                     if any(k in l.lower() for k in keywords):
                         seen.add(l)
