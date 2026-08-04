@@ -447,7 +447,12 @@ JS_HELPERS = r"""
     const t = (el.innerText || el.textContent || '').trim();
     const ms = pricesOf(el, t);
     if (!ms.length) return null;
-    const name = (nameOf(el) || '').replace(/\s+/g, ' ').trim();
+    // Лидл слага цената в самото име: „Смядовска луканка XXL за 5.36 EUR“.
+    // Махаме опашката, за да остане чисто име на продукта.
+    let name = (nameOf(el) || '').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\s*[-–—]?\s*за\s+\d{1,4}[.,]\d{2}\s*(EUR|€|лв|BGN)\s*\.?$/i, '')
+               .replace(/\s*\|\s*$/, '')
+               .trim();
     if (!name || name.length < 3) return null;
     const im = imgOf(el);
     return {name: name,
@@ -672,10 +677,17 @@ NEXT_JS = """
 
 # Страници, които никога не съдържат продукти. Обхождането им само яде
 # време и пълни „errors“ — при Лидл 15 от 20 посетени страници бяха такива.
-SKIP_URL = ("zashchita-na-dannite", "obshti-uslovia", "uslovia", "privacy",
-            "cookie", "karier", "kariera", "rabota", "kontakt", "za-nas",
-            "polezno-info", "igra", "kupon", "coupid", "plus", "app",
-            "magazin-lokator", "lokator", "newsletter", "impressum")
+# Дълги и характерни — търсят се като подниз
+SKIP_URL_PART = ("zashchita-na-dannite", "obshti-uslovia", "polezno-info",
+                 "magazin-lokator", "newsletter", "impressum", "privacy-policy",
+                 "cookie-policy", "chesto-zadavani", "dostavka-i-plashtane")
+# Кратки — само като ЦЯЛА част от адреса. Иначе „app“ съвпада вътре в
+# случайни думи и изяжда цели вериги: точно така dm падна от 222 на 0.
+SKIP_URL_WORD = {"uslovia", "privacy", "cookie", "cookies", "karier", "kariera",
+                 "rabota", "kontakt", "kontakti", "za-nas", "igra", "igri",
+                 "kupon", "kuponi", "coupid", "plus", "app", "lokator",
+                 "terms", "about", "careers", "contact"}
+
 SKIP_TITLE = ("защита на данните", "общи условия", "поверителност", "бисквитк",
               "кариер", "контакт", "за нас", "полезно инфо", "доставка и плащане",
               "често задавани", "карта на сайта")
@@ -683,7 +695,10 @@ SKIP_TITLE = ("защита на данните", "общи условия", "п
 
 def _useful_url(url):
     low = url.lower()
-    return not any(k in low for k in SKIP_URL)
+    if any(k in low for k in SKIP_URL_PART):
+        return False
+    parts = set(re.split(r"[/\-_.?=&#]+", low))
+    return not (parts & SKIP_URL_WORD)
 
 
 def _harvest(ctx, store, url, keywords=()):
