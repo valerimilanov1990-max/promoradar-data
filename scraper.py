@@ -250,6 +250,58 @@ def enrich(item):
     return item
 
 
+# Заглавия, които идват от рекламни рубрики, а не от стока. Улавят се тук,
+# а не в JavaScript, защото същият текст стига и по други пътища.
+JUNK_NAME_RE = re.compile(
+    r"^\s*(тествай(те)?\b"
+    r"|печеливш(и|ите)?\s+участниц"
+    r"|тест\s+на\s+продукт"
+    r"|играй(те)?\b|спечели\b|томбола\b"
+    r"|виж(те)?\s+повече\b|научи\s+повече\b"
+    r"|седмични\s+предложения?\b|наши(те)?\s+предложени"
+    r"|нови\s+продукти\b|всички\s+продукти\b"
+    r"|разгледай|каталог\b|брошура\b|листовк"
+    r"|абонирай|бюлетин\b)", re.IGNORECASE)
+
+# „25 пране (0,23 лв. за 1 пране)“ — това е ред с цена за единица, не име.
+UNIT_AS_NAME_RE = re.compile(
+    r"^\s*\d+([.,]\d+)?\s*(пранe|пране|бр|броя|г|гр|кг|мл|л|ml|g|kg|l)\b"
+    r"|лв\.?\s*за\s+\d", re.IGNORECASE)
+
+# Картинки, които не са стока: рейтинг-звездички, лога, иконки.
+JUNK_IMG_RE = re.compile(
+    r"review-ui|/stars?/|starfilled|staremp|rating|"
+    r"/logo|placeholder|sprite|favicon|\.svg(\?|$)", re.IGNORECASE)
+
+
+def is_junk_offer(o):
+    """True = това не е стока и не бива да влиза във фийда."""
+    name = (o.get("name") or "").strip()
+    if len(name) < 3:
+        return True
+    if JUNK_NAME_RE.search(name) or UNIT_AS_NAME_RE.search(name):
+        return True
+    # само главни букви и препинателни знаци, без нито една буква — не е име
+    if not re.search(r"[A-Za-zА-Яа-я]{3}", name):
+        return True
+    p = o.get("price")
+    if not isinstance(p, (int, float)) or p <= 0 or p > 5000:
+        return True
+    return False
+
+
+def clean_offer(o):
+    """Маха подвеждащите полета, без да изхвърля целия запис."""
+    if JUNK_IMG_RE.search(o.get("img") or ""):
+        o["img"] = ""
+    old, price = o.get("old"), o.get("price")
+    # Стара цена, която е под или равна на новата, не е стара цена.
+    if old is not None and price and old <= price * 1.005:
+        o["old"] = None
+        o.pop("pct", None)
+    return o
+
+
 # ---------------------------------------------------------------------------
 # 1. eBag — през истински браузър (с резервен вариант requests)
 # ---------------------------------------------------------------------------
@@ -605,6 +657,12 @@ DEFAULT_TARGETS = [
 ]
 
 
+# Колко страници да се обходят за конкретна верига. Има смисъл, защото
+# Кауфланд дава 1108 оферти от 3 страници, а Лидл обикаля 20 и връща 64:
+# без таван бавната верига изяжда бюджета на бързите.
+STORE_PAGES = {}
+
+
 def _load_targets():
     """Чете веригите от config.json; при липса ползва вградените."""
     raw = CFG.get("stores")
@@ -618,6 +676,8 @@ def _load_targets():
             name = str(s["name"]).strip()
             urls = [u for u in s.get("urls", []) if str(u).startswith("http")]
             kws = tuple(str(k).lower() for k in s.get("keywords", []))
+            if s.get("max_pages"):
+                STORE_PAGES[name] = int(s["max_pages"])
             if name and urls:
                 out.append((name, urls, kws))
         except Exception as e:
@@ -706,7 +766,14 @@ NEXT_JS = """
 # Дълги и характерни — търсят се като подниз
 SKIP_URL_PART = ("zashchita-na-dannite", "obshti-uslovia", "polezno-info",
                  "magazin-lokator", "newsletter", "impressum", "privacy-policy",
-                 "cookie-policy", "chesto-zadavani", "dostavka-i-plashtane")
+                 "cookie-policy", "chesto-zadavani", "dostavka-i-plashtane",
+                 # dm вика „тествайте продукт“ страници продуктови, но там
+                 # няма цени — числата по тях са дати и брой участници.
+                 # Оттам идваха „Печеливши участници −15%“ и „Тествайте…“.
+                 "produkt-test", "test-na-produkt", "produktov-svyat",
+                 "nashata-otgovornost", "za-dm-kontserna", "informatsiya-za-",
+                 # редакционни/корпоративни рубрики без стоки
+                 "novini", "blog", "recepti", "sertifikat")
 # Кратки — само като ЦЯЛА част от адреса. Иначе „app“ съвпада вътре в
 # случайни думи и изяжда цели вериги: точно така dm падна от 222 на 0.
 SKIP_URL_WORD = {"uslovia", "privacy", "cookie", "cookies", "karier", "kariera",
@@ -897,8 +964,9 @@ def scrape_dom_offers(ctx):
         # Времето се дели поравно между веригите, за да не изяде първата всичко
         store_deadline = _time.time() + max(60, (TIME_BUDGET_S - (_time.time() - _START))
                                             / max(1, len(TARGETS) - TARGETS.index((store, urls, keywords))))
+        page_cap = STORE_PAGES.get(store, MAX_PAGES)
         per_store, queue, visited = [], list(urls), set()
-        while queue and len(visited) < MAX_PAGES:
+        while queue and len(visited) < page_cap:
             if out_of_time() or _time.time() > store_deadline:
                 OUT["stats"][f"време/{store}"] = f"спрян на {len(visited)} страници"
                 break
@@ -909,7 +977,7 @@ def scrape_dom_offers(ctx):
             items, extra = _harvest(ctx, store, url, keywords)
             per_store += items
             for l in extra:
-                if l not in visited and l not in queue and len(queue) < MAX_PAGES * 3:
+                if l not in visited and l not in queue and len(queue) < page_cap * 3:
                     queue.append(l)
             # Малка пауза — не искаме да натоварваме чужди сайтове
             if POLITE_MS:
@@ -921,14 +989,20 @@ def scrape_dom_offers(ctx):
             if len(per_store) >= MAX_PER_STORE * 2:
                 break
 
-        seen, ded = set(), []
+        seen, ded, junk = set(), [], 0
         for o in per_store:
+            if is_junk_offer(o):
+                junk += 1
+                continue
+            o = clean_offer(o)
             k = (o["name"].lower(), o["price"])
             if k not in seen:
                 seen.add(k)
                 ded.append(o)
         OUT["offers"] += ded[:MAX_PER_STORE]
         OUT["stats"][f"offers/{store}"] = f"{len(ded[:MAX_PER_STORE])} от {len(visited)} страници"
+        if junk:
+            OUT["stats"][f"изхвърлени/{store}"] = f"{junk} нестокови записа"
         if not ded:
             note(f"dom/{store}", "0 оферти — вероятно смениха сайта, провери селекторите")
 
@@ -1072,18 +1146,145 @@ PRIORITY_CHAINS = [
 ]
 
 
+# Кошницата: с какво реално се пазарува. Официалният архив на КЗП е над
+# милион реда и ако се реже сляпо, в приложението остават случайни стоки от
+# случайни вериги — точно затова „яйца“ намираше само „ГРОС МАКАРОНИ С ЯЙЦА“
+# в три непознати магазина. Тук всяка верига получава своя дял ПЪРВО от
+# основните стоки, и чак после от останалото.
+BASKET = {
+    "хляб": ("ХЛЯБ", "ХЛЕБ", "ПИТК"),
+    "мляко": ("МЛЯКО", "МЛЕК"),
+    "кисело мляко": ("КИСЕЛО",),
+    "сирене": ("СИРЕНЕ", "СИРЕН"),
+    "кашкавал": ("КАШКАВАЛ",),
+    "масло": ("МАСЛО",),
+    "олио": ("ОЛИО",),
+    "яйца": ("ЯЙЦА", "ЯЙЦЕ"),
+    "захар": ("ЗАХАР",),
+    "брашно": ("БРАШНО",),
+    "ориз": ("ОРИЗ",),
+    "макарони": ("МАКАРОН", "СПАГЕТ", "ФИДЕ", "ПАСТА"),
+    "боб": ("БОБ", "ФАСУЛ"),
+    "леща": ("ЛЕЩА",),
+    "картофи": ("КАРТОФ",),
+    "домати": ("ДОМАТ",),
+    "краставици": ("КРАСТАВИЦ",),
+    "лук": ("ЛУК",),
+    "чушки": ("ЧУШК", "ПИПЕРК"),
+    "моркови": ("МОРКОВ",),
+    "зеле": ("ЗЕЛЕ",),
+    "ябълки": ("ЯБЪЛК",),
+    "банани": ("БАНАН",),
+    "портокали": ("ПОРТОКАЛ",),
+    "лимони": ("ЛИМОН",),
+    "грозде": ("ГРОЗДЕ",),
+    "диня": ("ДИНЯ", "ПЪПЕШ"),
+    "кайма": ("КАЙМА",),
+    "свинско": ("СВИНС", "СВИНСКО"),
+    "пилешко": ("ПИЛЕ", "ПИЛЕШ"),
+    "телешко": ("ТЕЛЕШ", "ГОВЕЖД"),
+    "кебапче": ("КЕБАПЧ", "КЮФТЕ"),
+    "наденица": ("НАДЕНИЦ",),
+    "луканка": ("ЛУКАНК",),
+    "салам": ("САЛАМ",),
+    "шунка": ("ШУНКА",),
+    "риба": ("РИБА", "СКУМРИЯ", "СЬОМГА", "ХЕК", "ЦАЦА", "ПЪСТЪРВ"),
+    "кафе": ("КАФЕ",),
+    "чай": ("ЧАЙ",),
+    "вода": ("ВОДА",),
+    "сок": ("СОК", "НЕКТАР"),
+    "бира": ("БИРА",),
+    "вино": ("ВИНО",),
+    "ракия": ("РАКИЯ", "ВОДКА", "УИСКИ", "МАСТИКА"),
+    "оцет": ("ОЦЕТ",),
+    "сол": ("СОЛ",),
+    "черен пипер": ("ПОДПРАВК", "ЧУБРИЦ"),
+    "шоколад": ("ШОКОЛАД",),
+    "вафла": ("ВАФЛ",),
+    "бисквити": ("БИСКВИТ",),
+    "чипс": ("ЧИПС", "СНАКС", "КРЕКЕР"),
+    "ядки": ("ЯДК", "ФЪСТЪ", "БАДЕМ", "КАШУ", "ЛЕШНИК"),
+    "сладолед": ("СЛАДОЛЕД",),
+    "мед": ("МЕД",),
+    "конфитюр": ("КОНФИТЮР", "МАРМАЛАД"),
+    "тахан": ("ТАХАН", "ХАЛВА"),
+    "кетчуп": ("КЕТЧУП",),
+    "майонеза": ("МАЙОНЕЗА",),
+    "горчица": ("ГОРЧИЦА", "ЛЮТЕНИЦ"),
+    "тоалетна хартия": ("ТОАЛЕТНА",),
+    "салфетки": ("САЛФЕТК", "КЪРПИЧК"),
+    "прах за пране": ("ПРАХ", "ПЕРИЛЕН", "ГЕЛ ЗА ПРАНЕ"),
+    "омекотител": ("ОМЕКОТИТЕЛ",),
+    "препарат за съдове": ("ПРЕПАРАТ", "ПОЧИСТВАЩ"),
+    "сапун": ("САПУН",),
+    "шампоан": ("ШАМПОАН",),
+    "паста за зъби": ("ПАСТА ЗА ЗЪБИ", "ЗЪБНА"),
+    "дезодорант": ("ДЕЗОДОРАНТ", "АНТИПЕРСПИРАНТ"),
+    "пелени": ("ПЕЛЕН",),
+}
+
+# Думи, след които следващата дума е СЪСТАВКА, а не стоката. Без тях
+# „яйца“ лови „макарони С яйца“, а „мляко“ лови „шоколад С мляко“.
+_INGREDIENT_MARKER = {"С", "СЪС", "ВКУС", "АРОМАТ", "ЗА", "БЕЗ", "ОТ",
+                      "И", "В", "ВЪВ", "НА", "ПЪЛНЕЖ", "ПЛЪНКА"}
+
+
+# Грамажите не са част от името: „450 ГР. СЕЛСКИ ПШЕНИЧЕН ХЛЯБ“ трябва да
+# се брои за хляб, а мярката отпред само измества думата надясно.
+_UNIT_WORDS = {"Г", "ГР", "КГ", "МЛ", "Л", "ML", "G", "KG", "L",
+               "БР", "БРОЯ", "Х", "X", "СМ", "CM"}
+
+
+def _name_words(s):
+    out = []
+    for w in re.split(r"[^0-9A-Za-zА-Яа-яЁё]+", (s or "").upper()):
+        if not w or w[0].isdigit() or w in _UNIT_WORDS:
+            continue
+        out.append(w)
+    return out
+
+
+def basket_key(name):
+    """Към коя основна стока спада редът. None = не е от кошницата.
+
+    Гледа се и КЪДЕ стои думата: стоката се казва в началото на името,
+    а съставките — след „с“/„със“. Затова „ЯЙЦА ЗДРАВКОВЕЦ 6БР“ минава,
+    а „ГРОС МАКАРОНИ С ЯЙЦА“ — не.
+    """
+    ws = _name_words(name)
+    if not ws:
+        return None
+    best = None
+    for key, stems in BASKET.items():
+        for i, w in enumerate(ws[:4]):
+            if not any(w.startswith(st) for st in stems):
+                continue
+            if i and ws[i - 1] in _INGREDIENT_MARKER:
+                break
+            if best is None or i < best[1]:
+                best = (key, i)
+            break
+    return best[0] if best else None
+
+
 def _select_basics(rows):
     """Избира кои официални цени да влязат във фийда.
 
-    Архивът на КЗП е огромен — над милион реда от 131 вериги, защото
-    съдържа по един запис за всеки магазин на веригата. Два проблема:
-    файлът става непосилен, а сляпото рязане изхвърля точно големите вериги.
+    Архивът на КЗП е над милион реда от 128 вериги — по един запис за всеки
+    магазин. Старият подход (първите N реда на верига) даваше файл, в който
+    големите вериги ги нямаше, а обикновените стоки ги имаше само на случаен
+    принцип. Затова сега:
 
-    Затова: първо сливаме повторенията (една цена на продукт във верига,
-    най-ниската), после даваме дял първо на веригите, в които се пазарува.
+      1) сливане — една цена за продукт във верига, най-ниската;
+      2) кошницата ПЪРВА — за всяка верига и всяка основна стока се пазят
+         най-евтините няколко реда, тоест всяка верига има мляко, яйца, хляб;
+      3) остатъкът пълни каквото е останало от тавана, приоритетно за
+         веригите, в които хората реално пазаруват.
     """
     per_chain = int(CFG.get("max_basics_per_chain", 1500))
-    total_cap = int(CFG.get("max_basics_total", 20000))
+    total_cap = int(CFG.get("max_basics_total", 26000))
+    per_item = int(CFG.get("max_basics_per_item", 4))
+    basket_cap = int(CFG.get("max_basics_basket", 22000))
 
     # 1) сливане: най-ниската цена за продукт във всяка верига
     merged = {}
@@ -1093,29 +1294,50 @@ def _select_basics(rows):
         if cur is None or r["price"] < cur["price"]:
             merged[key] = r
 
-    buckets = {}
+    # 2) разделяне на „кошница“ и „останало“
+    pairs, rest = {}, {}
     for r in merged.values():
-        buckets.setdefault(r["chain"], []).append(r)
+        k = basket_key(r["product"])
+        if k:
+            r["k"] = k
+            pairs.setdefault((r["chain"], k), []).append(r)
+        else:
+            rest.setdefault(r["chain"], []).append(r)
 
-    # 2) подредба: първо приоритетните, после останалите по големина
     def rank(chain):
         return (PRIORITY_CHAINS.index(chain) if chain in PRIORITY_CHAINS
                 else len(PRIORITY_CHAINS) + 1)
 
-    order = sorted(buckets.keys(), key=lambda c: (rank(c), -len(buckets[c])))
-
     picked = []
+    for (chain, k) in sorted(pairs.keys(), key=lambda ck: (rank(ck[0]), ck[1])):
+        if len(picked) >= basket_cap:
+            break
+        lst = sorted(pairs[(chain, k)], key=lambda r: r["price"])
+        picked.extend(lst[:per_item])
+    basket_n = len(picked)
+
+    # 3) останалото — по приоритет на веригата, докато има място
+    order = sorted(rest.keys(), key=lambda c: (rank(c), -len(rest[c])))
+    room_per_chain = max(50, per_chain)
     for ch in order:
         if len(picked) >= total_cap:
             break
-        picked.extend(buckets[ch][:per_chain])
+        picked.extend(sorted(rest[ch], key=lambda r: r["price"])[:room_per_chain])
 
     picked = picked[:total_cap]
+
+    # „name“ дублира „product“ дума по дума — маха се, това е 30% от файла
+    for r in picked:
+        r.pop("name", None)
+
     got = sorted({r["chain"] for r in picked})
-    OUT["stats"]["basics_вериги_в_архива"] = len(buckets)
+    basket_chains = sorted({r["chain"] for r in picked if r.get("k")})
+    OUT["stats"]["basics_вериги_в_архива"] = len({r["chain"] for r in merged.values()})
     OUT["stats"]["basics_редове_в_архива"] = len(rows)
     OUT["stats"]["basics_след_сливане"] = len(merged)
-    OUT["stats"]["basics"] = f"{len(picked)} реда, {len(got)} вериги"
+    OUT["stats"]["basics"] = (f"{len(picked)} реда, {len(got)} вериги "
+                              f"(от тях {basket_n} основни стоки в "
+                              f"{len(basket_chains)} вериги)")
     OUT["stats"]["basics_chains"] = got
     missing = [c for c in PRIORITY_CHAINS[:6] if c not in got]
     if missing:

@@ -44,13 +44,15 @@
         "oferti",
         "ot-ponedelnik",
         "ot-chetvartak"
-      ]
+      ],
+      "max_pages": 8
     },
     {
       "name": "Лидл",
       "enabled": true,
       "urls": [
-        "https://www.lidl.bg/"
+        "https://www.lidl.bg/",
+        "https://www.lidl.bg/c/onlayn-oferti/s10007373"
       ],
       "keywords": [
         "/c/",
@@ -60,7 +62,8 @@
         "top-",
         "promo"
       ],
-      "_": "„/c/“ е нужно — без него Лидл дава 0. Ненужните страници се отсяват в кода."
+      "_": "„/c/“ е нужно — без него Лидл дава 0. Ненужните страници се отсяват в кода.",
+      "max_pages": 10
     },
     {
       "name": "Метро",
@@ -77,68 +80,77 @@
     },
     {
       "name": "Билла",
-      "enabled": false,
+      "enabled": true,
       "urls": [
-        "https://www.billa.bg/promocii"
+        "https://www.billa.bg/promocii",
+        "https://www.billa.bg/"
       ],
       "keywords": [
         "promocii",
         "promo",
         "oferti",
-        "katalog"
+        "katalog",
+        "produkt"
       ],
-      "_": "billa.bg/promocii е брошура-картинка, без плочки. Цените идват от КЗП."
+      "_": "Пробва се пак: ако пак върне 0 плочки, значи има само брошура-картинка.",
+      "max_pages": 10
     },
     {
-      "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване.",
+      "_": "onlinefantastico.bg е истински онлайн магазин с плочки — повече шанс от началната.",
       "__": "вече го изчаква. Ако пак дадат 0, значи блокират автоматизацията.",
       "name": "Фантастико",
-      "enabled": false,
+      "enabled": true,
       "urls": [
-        "https://fantastico.bg/",
-        "https://fantastico.bg/promo"
+        "https://onlinefantastico.bg/",
+        "https://www.fantastico.bg/promo",
+        "https://www.fantastico.bg/"
       ],
       "keywords": [
         "promo",
         "oferti",
-        "broshura",
         "produkt",
-        "katalog"
-      ]
+        "katalog",
+        "category",
+        "kategori"
+      ],
+      "max_pages": 12
     },
     {
       "name": "T-Market",
-      "enabled": false,
+      "enabled": true,
       "urls": [
-        "https://tmarket.bg/",
-        "https://tmarket.bg/promocii"
+        "https://tmarket.bg/promocii",
+        "https://tmarket.bg/"
       ],
       "keywords": [
         "promo",
         "oferti",
-        "broshura",
         "produkt",
-        "katalog"
+        "katalog",
+        "kategori"
       ],
-      "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване."
+      "_": "Изключен: JS защитен екран „Един момент…“ не пада и при изчакване.",
+      "max_pages": 10
     },
     {
       "_": "Изключен: lillydrogerie.bg не дава продуктови плочки (0 от 11 страници). Цените идват от КЗП.",
       "name": "Lilly",
-      "enabled": false,
+      "enabled": true,
       "urls": [
-        "https://lillydrogerie.bg/products",
-        "https://lillydrogerie.bg/"
+        "https://lillydrogerie.bg/",
+        "https://lillydrogerie.bg/promo"
       ],
       "keywords": [
-        "product",
         "promo",
+        "product",
+        "produkt",
         "katalog",
         "kategoriya"
-      ]
+      ],
+      "max_pages": 10
     },
     {
-      "_": "ПОПРАВЕНО: dm.bg не съществува (ERR_NAME_NOT_RESOLVED).",
+      "_": "Ключът „produkt“ водеше към /novo/produkt-test/ — рекламни страници без стоки.",
       "name": "dm",
       "enabled": true,
       "urls": [
@@ -149,24 +161,47 @@
         "oferti",
         "promo",
         "aktsii",
-        "produkt"
-      ]
+        "/p/"
+      ],
+      "max_pages": 14
     },
     {
       "_": "Изключен: cba.bg/promocii дава 404, а началната страница няма",
       "__": "продуктови плочки. Включи го, ако намериш работещ адрес.",
       "name": "CBA",
-      "enabled": false,
+      "enabled": true,
       "urls": [
-        "https://cba.bg/"
+        "https://cba.bg/",
+        "https://cba.bg/promocii"
       ],
       "keywords": [
         "promo",
         "oferti",
-        "broshura"
-      ]
+        "broshura",
+        "produkt"
+      ],
+      "max_pages": 8
+    },
+    {
+      "name": "eBag",
+      "enabled": true,
+      "max_pages": 12,
+      "urls": [
+        "https://www.ebag.bg/promo",
+        "https://www.ebag.bg/"
+      ],
+      "keywords": [
+        "promo",
+        "oferti",
+        "namaleni",
+        "/c/",
+        "kategoriya"
+      ],
+      "_": "Онлайн супермаркет с истински плочки и цени — най-сигурният нов източник."
     }
   ],
-  "max_basics_per_chain": 1500,
-  "max_basics_total": 20000
+  "max_basics_per_chain": 1200,
+  "max_basics_total": 26000,
+  "max_basics_per_item": 4,
+  "max_basics_basket": 22000
 }
