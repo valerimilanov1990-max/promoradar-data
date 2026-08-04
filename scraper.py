@@ -227,13 +227,26 @@ def pick_price_pair(prices, pct=None):
 
 
 def enrich(item):
-    """Добавя qty/unit/unitPrice към запис с полета name+price."""
-    up = unit_price(item.get("price"), item.get("name") or item.get("product", ""))
+    """Добавя qty/unit/unitPrice към запис с полета name+price.
+
+    Тук е и последната проверка срещу фалшиви намаления: ако „старата
+    цена“ съвпада с цената за единица, тя не е стара цена, а цената за
+    килограм/литър, попаднала в грешното поле. Проверката е числена, тоест
+    хваща случая независимо как магазинът я е изписал.
+    """
+    name = item.get("name") or item.get("product", "")
+    up = unit_price(item.get("price"), name)
     if up:
         item["unitPrice"], item["unitLabel"] = up
-    q = parse_qty(item.get("name") or item.get("product", ""))
+    q = parse_qty(name)
     if q:
         item["qty"], item["qtyUnit"] = q
+
+    old = item.get("old")
+    if old and up and abs(old - up[0]) <= max(0.02, up[0] * 0.01):
+        item["old"] = None
+        if item.get("pct"):
+            item["pct"] = None
     return item
 
 
@@ -317,7 +330,12 @@ JS_HELPERS = r"""
   const PRICE_T = /\d{1,4}[.,]\d{2}/;
 
   // Редове като „цена за кг: 9.95“ са единични цени, не цената на продукта.
-  const isUnitLine = (l) => /цена\s*за|\/\s*(кг|kg|л|l|бр|100\s*(г|мл))|за\s+\d+\s*(г|мл|kg|кг)\b/i.test(l);
+  // dm я пише като „(13,20 лв. за 1 L)“ — това е цена за литър, не стара
+  // цена. Без този филтър всяка тяхна оферта излизаше с фалшиви -80%.
+  const isUnitLine = (l) => /цена\s*за/i.test(l)
+    || /\d\s*(лв|лева|eur|€)\.?\s*(\/|за)\s*\d*\s*(кг|kg|л\b|l\b|г\b|g\b|мл|ml|бр)/i.test(l)
+    || /\/\s*(кг|kg|л\b|l\b|бр|100\s*(г|мл))/i.test(l)
+    || /за\s+\d+([.,]\d+)?\s*(кг|kg|г\b|g\b|л\b|l\b|мл|ml|бр)\b/i.test(l);
 
   // След числото стои мярка -> това е ОБЕМ/ТЕГЛО, не цена („Мартини 0,75 л“).
   const UNIT_AFTER = /^\s*(л\b|l\b|кг|kg|гр|г\b|g\b|мл|ml|бр|броя|%|["“”]|x|х|см|cm|мм|mm|м\b|m\b|вт|w\b|kw|квт)/i;
@@ -389,6 +407,13 @@ JS_HELPERS = r"""
     return /[._]/.test(s) || /^[a-z]+[A-Z]/.test(s);
   };
 
+  // „0,2 L (13,20 лв. за 1 L)“ не е име на продукт, а ред с мерки.
+  const mostlyNumeric = (s) => {
+    const digits = (s.match(/\d/g) || []).length;
+    const letters = (s.match(/[A-Za-zА-Яа-я]/g) || []).length;
+    return letters < 5 || digits >= letters;
+  };
+
   const nameOf = (el) => {
     // Събираме ВСИЧКИ кандидати и взимаме най-информативния.
     // Ако вземем първия заглавен елемент, за Кауфланд излиза само
@@ -410,6 +435,7 @@ JS_HELPERS = r"""
       if (isUnitLine(s)) continue;
       if (looksLikeDescription(s)) continue;
       if (looksLikeCode(s)) continue;
+      if (mostlyNumeric(s)) continue;
       if (s.length > best.length) best = s;
     }
     return best;
