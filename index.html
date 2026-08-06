@@ -213,6 +213,27 @@ const qWords = s => s.toLowerCase().split(/[^0-9a-zа-яё]+/)
   .filter(w => w && !/^\d/.test(w) && !UNITS.has(w));
 const wordHit = (w, q) => w.startsWith(q) || (q.startsWith(w) && w.length >= 4);
 
+/* Синоними и транслитерация — огледало на DataFeed. „Омар“ намира
+   лобстер, „милка“ намира Milka. */
+const SYN_GROUPS = [
+  ["омар","лобстер","лобстър"],["скарид","шримс"],["пелен","памперс"],
+  ["пуйк","пуешк"],["телешк","говежд"],["чушк","пиперк"],
+  ["сьомг","somon","salmon"],["октопод","ахтапод"],["кашкавал","качокавал"],
+  ["фъстъчен","фъстъц"],["уиски","whisky","whiskey"],["хамбургер","бургер"]];
+const TRANSLIT = {"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ж":"zh","з":"z",
+  "и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s",
+  "т":"t","у":"u","ф":"f","х":"h","ц":"ts","ч":"ch","ш":"sh","щ":"sht","ъ":"a",
+  "ь":"y","ю":"yu","я":"ya","ё":"yo"};
+const translit = w => [...w].map(c => TRANSLIT[c] ?? c).join("");
+function altsFor(q) {
+  const out = [q];
+  const g = SYN_GROUPS.find(g => g.some(t => t.startsWith(q) || q.startsWith(t)));
+  if (g) out.push(...g);
+  const tr = translit(q);
+  if (tr !== q) out.push(tr);
+  return out;
+}
+
 function matchScore(product, query) {
   const pw = qWords(product);
   if (!pw.length) return -1;
@@ -224,9 +245,10 @@ function matchScore(product, query) {
   const single = qw.length === 1;
   let worst = 0, first = 1e9;
   for (const q of qw) {
+    const alts = altsFor(q);
     let found = -1;
     for (let i = 0; i < pw.length; i++) {
-      if (!wordHit(pw[i], q)) continue;
+      if (!alts.some(a => wordHit(pw[i], a))) continue;
       if (single && i > 0 && MARKERS.has(pw[i-1])) continue;
       if (single && i > 3) continue;
       found = i; break;
@@ -551,7 +573,67 @@ async function rank() {
 }
 
 /* ---------- детайл ---------- */
+/* С коя дума да се сравнява между вериги. Първите две думи често са
+   МАРКАТА („ЧУДНИ ВАФЛИ“, „K-Classic“) и не съществуват другаде, затова
+   се опитват все по-прости кандидати — кирилските думи преди латинските
+   (латинските обикновено са марки), плюс отрязани окончания („вафл“
+   хваща и вафла, и вафли) — и печели този с най-много вериги. */
+function compareQuery(name, strict) {
+  // Кандидатите, от най-точния към най-общия:
+  //   1) първите две смислени кирилски думи („извара маджаров“ намира
+  //      същия продукт в другите вериги);
+  //   2) водещата дума — тази, чиято СОБСТВЕНА категория съвпада с
+  //      категорията на продукта („извара“ при mlek);
+  //   3) останалите думи и отрязаните им окончания.
+  // Определенията („български“, „продукт“, „натурален“) не са стоки и
+  // се прескачат, а имената се разлепят („продуктИзвара“ → две думи).
+  // В строгия режим („същата стока“) остават само комбинациите стока +
+  // марка — по-добре честно „няма я другаде“, отколкото друга марка.
+  const cat = catOf(name);
+  const toks = tokenize(name).filter(w => w.length >= 3 && !/^\d/.test(w));
+  const cyr = toks.filter(w => /[а-я]/.test(w) && !cmpStop(w));
+  const lat = toks.filter(w => !/[а-я]/.test(w) && !cmpStop(w));
+  const head = cat !== "drugo" ? toks.find(w => !cmpStop(w) && catOf(w) === cat) : null;
+  if (strict) {
+    // Целта е обратната на „подобни“: печели НАЙ-ТЕСНИЯТ въпрос, който
+    // все пак намира 2+ вериги („мляко верея“ бие „мляко кисело“).
+    // Партньорът е поне 4 букви — „oro“, „био“ са твърде къси и хващат
+    // чужди марки („кафе oro“ ловеше и Лидл Oro).
+    const others = toks.filter(w => w.length >= 4 && !cmpStop(w) && w !== head).slice(0, 4);
+    const pool = [];
+    if (head) for (const t of others) {
+      pool.push(head + " " + t);
+      if (t.length >= 5) pool.push(head + " " + t.slice(0, -1));
+    }
+    if (cyr.length >= 2) pool.push(cyr[0] + " " + cyr[1]);
+    if (!pool.length && head) pool.push(head);
+    let sBest = [], sq = pool[0] || name.slice(0, 20);
+    for (const q of [...new Set(pool)]) {
+      let ev = pricesEverywhere(S.search, q);
+      if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
+      if (ev.length >= 2 && (sBest.length < 2 || ev.length < sBest.length)) { sBest = ev; sq = q; }
+    }
+    return [sBest, sq];
+  }
+  const cands = [];
+  if (cyr.length >= 2) cands.push(cyr[0] + " " + cyr[1]);
+  if (head) { cands.push(head); if (head.length >= 5) cands.push(head.slice(0, -1)); }
+  for (const w of cyr.slice(0, 4)) { cands.push(w); if (w.length >= 5) cands.push(w.slice(0, -1)); }
+  for (const w of lat.slice(0, 2)) cands.push(w);
+  let best = [], bq = cands[0] || name.slice(0, 20);
+  for (const q of [...new Set(cands)]) {
+    let ev = pricesEverywhere(S.search, q);
+    if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
+    if (ev.length > best.length) { best = ev; bq = q; }
+    if (best.length >= 4) break;
+  }
+  return [best, bq];
+}
+const CMP_STOP = ["българ","продукт","натурал","оригинал","премиум","класик","традицион","нискомасл","висококач","свеж"];
+const cmpStop = w => CMP_STOP.some(s => w.startsWith(s));
+
 async function openDetail(ref) {
+  S.lastRef = ref;
   const o = ref.t === "offer"
     ? S.all.find(x => x.store === ref.s && x.name === ref.n)
     : null;
@@ -571,13 +653,15 @@ async function openDetail(ref) {
     ${ut ? `<div class="pill amber">${ut}</div>` : ""}
   </div>`;
 
-  const kw = name.split(/[\s,()]+/).filter(w => w.length >= 3 && !/\d/.test(w)).slice(0, 2).join(" ") || name.slice(0, 20);
   if (S.search) {
-    const ev = pricesEverywhere(S.search, kw);
+    const [ev, kw] = compareQuery(name, S.cmpStrict);
+    const modeBtns = `<div class="chips" style="margin:6px 0">
+      <button class="chip ${S.cmpStrict ? "" : "on"}" data-cmpmode="0">Подобни продукти</button>
+      <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">Същата стока</button></div>`;
     if (ev.length >= 2) {
       const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
-      html += `<h3>Цените навсякъде</h3>
-      <div class="note">в ${ev.length} вериги · от ${fmt(lo)} до ${fmt(hi)} лв · подобни продукти по „${esc(kw)}“</div>` +
+      html += `<h3>Цените навсякъде</h3>${modeBtns}
+      <div class="note">в ${ev.length} вериги · от ${fmt(lo)} до ${fmt(hi)} лв · ${S.cmpStrict ? "същата стока" : "подобни продукти"} по „${esc(kw)}“</div>` +
         ev.slice(0, 7).map((h, i) => `<div class="crow ${i === 0 ? "best" : ""} ${h.s === store ? "cur" : ""}">
           <span class="tag" style="color:${storeColor(h.s)}"><i style="background:${storeColor(h.s)}"></i>${esc(h.s.toUpperCase())}</span>
           ${i === 0 ? '<span class="pill mintf">най-евтино</span>' : ""}
@@ -585,7 +669,14 @@ async function openDetail(ref) {
           <div class="cn">${esc(h.n)}</div>
           <b>${fmt(h.p)} лв</b>${(h.u != null && h.l) ? `<small>${fmt(h.u)} ${h.l}</small>` : ""}
         </div>`).join("");
+    } else {
+      html += `<h3>Цените навсякъде</h3>${modeBtns}
+      <div class="note">${S.cmpStrict
+        ? "Не намерих същата стока в друга верига — виж „Подобни продукти“."
+        : "Не намерих подобен продукт в друга верига."}</div>`;
     }
+  } else {
+    html += `<div class="note">Индексът с всички цени още се тегли — отвори пак след миг.</div>`;
   }
 
   if (S.history) {
@@ -658,6 +749,12 @@ document.addEventListener("click", e => {
   if (open) { openDetail(JSON.parse(open.dataset.open)); return; }
   if (e.target.closest("[data-close]") || e.target.id === "modal") {
     $("modal").classList.remove("open"); return;
+  }
+  const cm = e.target.closest("[data-cmpmode]");
+  if (cm) {
+    S.cmpStrict = cm.dataset.cmpmode === "1";
+    if (S.lastRef) openDetail(S.lastRef);
+    return;
   }
   const sh = e.target.closest("[data-share]");
   if (sh) {
