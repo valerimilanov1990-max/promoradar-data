@@ -35,6 +35,8 @@ OUT = {
     "ebag": [],
     "offers": [],
     "basics": [],
+    "community": [],
+    "history": {},
     "brochures": [],
     "errors": [],
     "stats": {},
@@ -261,7 +263,10 @@ JUNK_NAME_RE = re.compile(
     r"|седмични\s+предложения?\b|наши(те)?\s+предложени"
     r"|нови\s+продукти\b|всички\s+продукти\b"
     r"|разгледай|каталог\b|брошура\b|листовк"
-    r"|абонирай|бюлетин\b)", re.IGNORECASE)
+    r"|абонирай|бюлетин\b"
+    # Открити при подреждането по категории: dm ги показва като плочки
+    r"|информация\s+за\s+продукт|налично\s+за\s+доставка"
+    r"|не\s+е\s+налично|кошница\s+с\s+грижа)", re.IGNORECASE)
 
 # „25 пране (0,23 лв. за 1 пране)“ — това е ред с цена за единица, не име.
 UNIT_AS_NAME_RE = re.compile(
@@ -283,6 +288,9 @@ def is_junk_offer(o):
         return True
     # само главни букви и препинателни знаци, без нито една буква — не е име
     if not re.search(r"[A-Za-zА-Яа-я]{3}", name):
+        return True
+    # „10 х 1 kg/опаковка“ — това е мярка, попаднала в полето за име
+    if "/опаковка" in name:
         return True
     p = o.get("price")
     if not isinstance(p, (int, float)) or p <= 0 or p > 5000:
@@ -1412,6 +1420,306 @@ def _dump(path, obj):
     return os.path.getsize(path)
 
 
+# ---------------------------------------------------------------------------
+# 4. Цени, подадени от хора и от магазини
+# ---------------------------------------------------------------------------
+#
+# Приложението няма сървър, затова подаването минава през чужда, безплатна
+# кутия: Google формуляр пише отговорите в таблица, таблицата се публикува
+# като CSV, а тук се чете само това, което е ОДОБРЕНО. Одобрението не е
+# бюрокрация — без него конкурентът отсреща вписва лъжливи цени още първия
+# ден и цялата база става безполезна.
+#
+# Ако адресът е празен, стъпката просто се пропуска.
+
+COMMUNITY_COLS = {
+    "shop": ("магазин", "shop", "обект"),
+    "town": ("град", "town", "населено"),
+    "product": ("продукт", "product", "стока", "артикул"),
+    "price": ("цена", "price"),
+    "qty": ("количество", "qty", "разфасовка", "грамаж"),
+    "barcode": ("баркод", "barcode", "ean"),
+    "date": ("дата", "date", "timestamp", "клеймо"),
+    "approved": ("одобрен", "approved", "ок", "ok"),
+    "role": ("роля", "role"),
+}
+
+
+def _col_index(header):
+    """Кой стълб какво е — по име, а не по номер.
+
+    Номерата се разместват при всяко добавяне на въпрос във формуляра;
+    имената оцеляват.
+    """
+    idx = {}
+    for i, h in enumerate(header):
+        low = re.sub(r"\s+", " ", (h or "")).strip().lower()
+        for key, names in COMMUNITY_COLS.items():
+            if key in idx:
+                continue
+            if any(low.startswith(n) for n in names):
+                idx[key] = i
+    return idx
+
+
+def _truthy(v):
+    return str(v).strip().lower() in ("да", "yes", "true", "1", "x", "ок", "ok", "✓")
+
+
+def scrape_community():
+    url = (CFG.get("community_csv_url") or "").strip()
+    if not url:
+        return
+    max_age = int(CFG.get("community_max_age_days", 21))
+    require_ok = bool(CFG.get("community_require_approved", True))
+    try:
+        r = requests.get(url, headers=UA, timeout=45)
+        if r.status_code != 200 or not r.content:
+            note("общност", f"таблицата не се чете (HTTP {r.status_code})")
+            return
+        r.encoding = r.apparent_encoding or "utf-8"
+        rows = list(csv.reader(io.StringIO(r.text)))
+    except Exception as e:
+        log_err("community", e)
+        return
+
+    if len(rows) < 2:
+        note("общност", "таблицата е празна")
+        return
+
+    idx = _col_index(rows[0])
+    missing = [k for k in ("shop", "product", "price") if k not in idx]
+    if missing:
+        note("общност", f"липсват стълбове: {', '.join(missing)} — "
+                        f"провери имената на въпросите във формуляра")
+        return
+
+    today = datetime.date.today()
+    out, skipped = [], {"неодобрени": 0, "стари": 0, "невалидни": 0}
+    for row in rows[1:]:
+        def cell(key):
+            i = idx.get(key)
+            return (row[i].strip() if i is not None and i < len(row) else "")
+
+        if require_ok and not _truthy(cell("approved")):
+            skipped["неодобрени"] += 1
+            continue
+
+        # Тук цената е гола („3.49“), не текст от плочка — PRICE_RE иска „лв“
+        m = re.search(r"\d+(?:[.,]\d+)?", cell("price"))
+        price = float(m.group(0).replace(",", ".")) if m else None
+        name = re.sub(r"\s+", " ", cell("product")).strip()
+        shop = re.sub(r"\s+", " ", cell("shop")).strip()
+        if not name or not shop or price is None or price <= 0 or price > 5000:
+            skipped["невалидни"] += 1
+            continue
+
+        # Свежест: стара подадена цена е по-лоша от липсваща, защото лъже
+        d = cell("date")[:10]
+        try:
+            when = datetime.date.fromisoformat(d)
+            if (today - when).days > max_age:
+                skipped["стари"] += 1
+                continue
+        except Exception:
+            when = None
+
+        rec = {"chain": shop[:40], "product": name[:90], "price": round(price, 2),
+               "town": cell("town")[:30], "date": d,
+               "barcode": re.sub(r"\D", "", cell("barcode"))[:14],
+               "src": "shop" if "магазин" in cell("role").lower() else "user"}
+        qty = cell("qty")
+        u = unit_price(rec["price"], f"{name} {qty}".strip())
+        if u:
+            rec["unitPrice"], rec["unitLabel"] = u
+        out.append(rec)
+
+    # Един магазин, един продукт — най-новата цена
+    best = {}
+    for rec in out:
+        k = (rec["chain"].lower(), rec["product"].lower())
+        cur = best.get(k)
+        if cur is None or (rec.get("date") or "") >= (cur.get("date") or ""):
+            best[k] = rec
+    OUT["community"] = list(best.values())
+    OUT["stats"]["общност"] = (f"{len(OUT['community'])} цени от "
+                               f"{len({r['chain'] for r in OUT['community']})} магазина")
+    for k, v in skipped.items():
+        if v:
+            OUT["stats"][f"общност_пропуснати_{k}"] = v
+
+
+# ---------------------------------------------------------------------------
+# 5. Доклади „цената не е вярна“
+# ---------------------------------------------------------------------------
+#
+# Обхождането ще греши — това е неизбежно, когато данните идват от чужди
+# сайтове, които се променят без предупреждение. Въпросът е дали грешката
+# остава да лъже, или някой я маха.
+#
+# Тук докладите от хората стават предпазител: продукт, за който няколко
+# НЕЗАВИСИМИ човека са казали едно и също, спира да се публикува. Прагът
+# не е формалност — един доклад може да е грешка или злоба, три вече са
+# данни. Записът не се трие мълчаливо: в stats пише колко и кои са паднали.
+
+REPORT_COLS = {
+    "shop": ("магазин", "shop", "верига"),
+    "product": ("продукт", "product", "стока"),
+    "kind": ("какво", "kind", "грешка", "вид"),
+    "date": ("дата", "date", "timestamp", "клеймо"),
+    "approved": ("одобрен", "approved", "ок", "ok"),
+}
+
+
+def _norm_key(s):
+    return re.sub(r"[^0-9a-zA-Zа-яА-Я]+", " ", (s or "").lower()).strip()
+
+
+def scrape_reports():
+    """Сваля докладите и маха офертите, за които има достатъчно оплаквания."""
+    url = (CFG.get("reports_csv_url") or "").strip()
+    if not url:
+        return
+    min_count = int(CFG.get("reports_min_count", 3))
+    max_age = int(CFG.get("reports_max_age_days", 30))
+    try:
+        r = requests.get(url, headers=UA, timeout=45)
+        if r.status_code != 200 or not r.content:
+            note("доклади", f"таблицата не се чете (HTTP {r.status_code})")
+            return
+        r.encoding = r.apparent_encoding or "utf-8"
+        rows = list(csv.reader(io.StringIO(r.text)))
+    except Exception as e:
+        log_err("reports", e)
+        return
+
+    if len(rows) < 2:
+        return
+
+    hdr = rows[0]
+    idx = {}
+    for i, h in enumerate(hdr):
+        low = re.sub(r"\s+", " ", (h or "")).strip().lower()
+        for key, names in REPORT_COLS.items():
+            if key not in idx and any(low.startswith(n) for n in names):
+                idx[key] = i
+    if "shop" not in idx or "product" not in idx:
+        note("доклади", "липсват стълбове магазин/продукт")
+        return
+
+    today = datetime.date.today()
+    counts = {}
+    for row in rows[1:]:
+        def cell(key):
+            i = idx.get(key)
+            return (row[i].strip() if i is not None and i < len(row) else "")
+
+        # Неодобрените се броят също — докладът не е публикация, а сигнал.
+        # Одобрението тук служи само да се СПРЕ явна злоупотреба.
+        if idx.get("approved") is not None and \
+                str(cell("approved")).strip().lower() in ("не", "no", "false", "0"):
+            continue
+        d = cell("date")[:10]
+        try:
+            if (today - datetime.date.fromisoformat(d)).days > max_age:
+                continue
+        except Exception:
+            pass
+        k = (_norm_key(cell("shop")), _norm_key(cell("product")))
+        if not k[0] or not k[1]:
+            continue
+        counts[k] = counts.get(k, 0) + 1
+
+    bad = {k for k, v in counts.items() if v >= min_count}
+    if not bad:
+        OUT["stats"]["доклади"] = (f"{len(counts)} докладвани продукта, "
+                                   f"нито един не стига прага от {min_count}")
+        return
+
+    before = len(OUT["offers"])
+    dropped = []
+    kept = []
+    for o in OUT["offers"]:
+        k = (_norm_key(o["store"]), _norm_key(o["name"]))
+        if k in bad:
+            dropped.append(f"{o['store']}: {o['name'][:40]}")
+        else:
+            kept.append(o)
+    OUT["offers"] = kept
+    OUT["stats"]["доклади"] = (f"{len(counts)} докладвани продукта, "
+                               f"{before - len(kept)} свалени (праг {min_count})")
+    if dropped:
+        OUT["stats"]["доклади_свалени"] = dropped[:20]
+
+
+# ---------------------------------------------------------------------------
+# 6. История на цените
+# ---------------------------------------------------------------------------
+#
+# Обхождането вижда само днешния ден; историята се РЪСТИ от пускане на
+# пускане: предишният feed/history.json се тегли от публикувания клон,
+# днешните цени се добавят и файлът се записва обратно. Така графиката в
+# приложението показва как се е движила цената — а това е и отговорът на
+# най-важния въпрос: истинско ли е „намалението“, или цената първо беше
+# вдигната.
+#
+# Точка се добавя само при ПРОМЯНА на цената (плюс първия запис) — иначе
+# файлът расте с 1400 реда дневно, без да казва нищо ново. Продукти,
+# невиждани от HISTORY_KEEP_DAYS дни, изпадат; точките се режат до
+# HISTORY_MAX_POINTS на продукт.
+
+HISTORY_MAX_POINTS = 40
+HISTORY_KEEP_DAYS = 60
+
+
+def _hist_key(store, name):
+    return (store.strip().lower() + "|" +
+            re.sub(r"\s+", " ", name).strip().lower()[:60])
+
+
+def build_history():
+    base = CFG.get(
+        "feed_raw_base",
+        "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data"
+    ).rstrip("/")
+
+    prev = {}
+    for br in ("data", "main"):
+        try:
+            r = requests.get(f"{base}/{br}/feed/history.json",
+                             headers=UA, timeout=30)
+            if r.status_code == 200 and r.content:
+                prev = json.loads(r.text).get("h", {})
+                break
+        except Exception:
+            continue
+
+    today = datetime.date.today().isoformat()
+    h = dict(prev)
+    changed = 0
+    for o in OUT["offers"]:
+        k = _hist_key(o["store"], o["name"])
+        e = h.get(k) or {"d": [], "p": [], "l": today}
+        price = round(float(o["price"]), 2)
+        if not e["p"] or abs(e["p"][-1] - price) > 0.005:
+            e["d"].append(today)
+            e["p"].append(price)
+            changed += 1
+        e["l"] = today
+        e["d"] = e["d"][-HISTORY_MAX_POINTS:]
+        e["p"] = e["p"][-HISTORY_MAX_POINTS:]
+        h[k] = e
+
+    # чистене: продукти, които никой не е виждал отдавна
+    cutoff = (datetime.date.today()
+              - datetime.timedelta(days=HISTORY_KEEP_DAYS)).isoformat()
+    h = {k: v for k, v in h.items() if v.get("l", "") >= cutoff}
+
+    OUT["history"] = h
+    OUT["stats"]["история"] = (f"{len(h)} продукта, {changed} нови точки, "
+                               f"наследени {len(prev)}")
+
+
 def write_output():
     """Пише разделен фийд + пълния файл за съвместимост.
 
@@ -1444,6 +1752,18 @@ def write_output():
                              "chains": chains,
                              "basics": OUT["basics"]})
 
+    # --- подадените цени (малък файл, но носи магазините, които никой не обхожда) ---
+    if OUT["community"]:
+        sizes["community"] = _dump("feed/community.json",
+                                   {"updated": OUT["updated"],
+                                    "prices": OUT["community"]})
+
+    # --- историята на цените (тегли се при отваряне на продукт) ---
+    if OUT["history"]:
+        sizes["history"] = _dump("feed/history.json",
+                                 {"updated": OUT["updated"],
+                                  "h": OUT["history"]})
+
     # --- компактен индекс за търсене (кратки ключове = малък файл) ---
     idx = []
     for o in OUT["offers"]:
@@ -1454,6 +1774,10 @@ def write_output():
         idx.append({"s": b["chain"], "n": b["product"], "p": b["price"],
                     "o": None, "u": b.get("unitPrice"),
                     "l": b.get("unitLabel", ""), "f": 1})
+    for c in OUT["community"]:
+        idx.append({"s": c["chain"], "n": c["product"], "p": c["price"],
+                    "o": None, "u": c.get("unitPrice"),
+                    "l": c.get("unitLabel", ""), "f": 2})
     sizes["search"] = _dump("feed/search.json",
                             {"updated": OUT["updated"], "items": idx})
 
@@ -1513,6 +1837,9 @@ def main():
                 pass
 
     scrape_basics()
+    scrape_community()
+    scrape_reports()
+    build_history()
 
     OUT["stats"]["време общо"] = f"{elapsed_min():.1f} мин"
     OUT["stats"]["offers_total"] = len(OUT["offers"])

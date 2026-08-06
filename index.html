@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Промо Радар — всички намаления и официалните цени</title>
+<meta name="description" content="Намаленията от всички вериги и официалните дневни цени на България, на едно място. Безплатно, без реклами.">
+<meta name="theme-color" content="#13372E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Промо Радар">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23131A22'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%233FDDA2' stroke-opacity='.35'/%3E%3Ccircle cx='32' cy='32' r='10' fill='none' stroke='%233FDDA2' stroke-opacity='.35'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%233FDDA2'/%3E%3C/svg%3E">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Промо Радар","short_name":"ПромоРадар","display":"standalone","background_color":"%23131A22","theme_color":"%2313372E","start_url":"."}'>
+<style>
+/* Същата визуална идентичност като Android приложението: мастило, ментов
+   сигнал, корал за попадение, кехлибар за мярка, цветна лента на веригата. */
+:root {
+  --ink:#131A22; --panel:#1E2832; --panelhi:#2A3641; --line:#374551;
+  --hi:#E4EBF1; --lo:#95A4B1; --mint:#3FDDA2; --coral:#FF7A7A;
+  --amber:#F7C266; --violet:#A695F2;
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { margin:0; background:var(--ink); color:var(--hi);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+body { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+
+header { background:linear-gradient(100deg,#13372E,#152736,#231B4A);
+  padding:calc(12px + env(safe-area-inset-top)) 18px 12px;
+  display:flex; align-items:center; gap:12px;
+  position:sticky; top:0; z-index:5; }
+header::after { content:""; position:absolute; left:0; right:30%; bottom:-2px;
+  height:2px; background:linear-gradient(90deg,var(--mint),var(--violet),transparent); }
+.logo { width:36px; height:36px; position:relative; flex:none; }
+.logo i { position:absolute; inset:0; border-radius:50%;
+  border:1px solid rgba(63,221,162,.25); }
+.logo i:nth-child(2){ inset:6px; } .logo i:nth-child(3){ inset:12px; }
+.logo b { position:absolute; left:50%; top:50%; width:9px; height:9px;
+  margin:-4.5px; border-radius:50%; background:var(--mint); }
+.logo s { position:absolute; inset:0; border-radius:50%; text-decoration:none;
+  background:conic-gradient(from 0deg, rgba(63,221,162,.35), transparent 70deg);
+  animation:sweep 3.6s linear infinite; }
+@keyframes sweep { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce){ .logo s { animation:none; } }
+h1 { font-size:17px; letter-spacing:2px; margin:0; font-weight:800; }
+h1 small { display:block; letter-spacing:.2px; font-size:11px;
+  color:rgba(63,221,162,.65); font-weight:400; }
+
+main { padding:12px 14px; max-width:640px; margin:0 auto; }
+.note { color:var(--lo); font-size:12px; margin:8px 2px; }
+.search input { width:100%; padding:13px 16px; border-radius:14px; border:0;
+  background:var(--panelhi); color:var(--hi); font-size:15px; outline:none; }
+.search input::placeholder { color:var(--lo); }
+
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px; }
+.chip { --c:var(--mint); border-radius:99px; padding:8px 14px; font-size:13px;
+  font-weight:700; background:var(--panelhi); color:var(--lo);
+  border:1px solid var(--line); cursor:pointer; }
+.chip.on { background:color-mix(in srgb, var(--c) 16%, transparent);
+  border-color:color-mix(in srgb, var(--c) 55%, transparent); color:var(--c); }
+.chip u { text-decoration:none; opacity:.6; font-weight:400; margin-left:3px; }
+.cats { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:4px; }
+.cats::-webkit-scrollbar { display:none; }
+.cat { flex:none; display:flex; flex-direction:column; align-items:center; gap:1px;
+  min-width:64px; padding:8px 10px; border-radius:14px; font-size:11px;
+  background:var(--panelhi); color:var(--lo); border:1px solid var(--line); cursor:pointer; }
+.cat span { font-size:17px; } .cat u { text-decoration:none; opacity:.55; }
+.cat.on { background:rgba(63,221,162,.16); border-color:rgba(63,221,162,.55); color:var(--mint); }
+
+.card { display:flex; align-items:center; gap:12px; background:var(--panel);
+  border-radius:18px; margin:10px 0; overflow:hidden; cursor:pointer; min-height:76px; }
+.card .bar { width:4px; align-self:stretch; flex:none; }
+.card img { width:60px; height:60px; object-fit:contain; border-radius:12px;
+  background:var(--panelhi); flex:none; }
+.noimg { width:60px; height:60px; border-radius:12px; background:var(--panelhi);
+  display:flex; align-items:center; justify-content:center; font-weight:800; flex:none; }
+.mid { flex:1; min-width:0; padding:10px 0; }
+.tag { display:flex; align-items:center; gap:5px; font-size:10.5px;
+  font-weight:800; letter-spacing:.8px; }
+.tag i { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.nm { font-weight:600; font-size:13.5px; margin:3px 0;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pill { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px;
+  border-radius:7px; border:1px solid; }
+.pill.amber { color:var(--amber); border-color:rgba(247,194,102,.45);
+  background:rgba(247,194,102,.12); }
+.pill.violet { color:var(--violet); border-color:rgba(166,149,242,.45);
+  background:rgba(166,149,242,.12); margin-left:6px; }
+.pill.mintf { color:var(--ink); background:var(--mint); border-color:var(--mint); }
+.pr { text-align:right; padding:10px 12px 10px 0; flex:none; display:flex;
+  flex-direction:column; align-items:flex-end; gap:1px; }
+.pr b { font-size:19px; color:var(--mint); font-weight:900; letter-spacing:-.5px; }
+.pr b em { font-style:normal; font-size:11px; margin-left:2px; }
+.pr b.hot { color:var(--coral); }
+.pr s { color:var(--lo); font-size:11px; }
+.pr small { color:var(--lo); font-size:11px; }
+.badge { background:linear-gradient(90deg,var(--coral),#FFA95E); color:var(--ink);
+  font-weight:900; font-size:11px; padding:2px 7px;
+  border-radius:9px 3px 9px 3px; }
+.card.slim { min-height:60px; padding-left:0; }
+.empty { text-align:center; padding:40px 20px; color:var(--lo); }
+.empty b { color:var(--hi); font-size:15px; }
+
+.nav { position:fixed; left:16px; right:16px;
+  bottom:calc(10px + env(safe-area-inset-bottom)); display:flex; gap:4px;
+  background:var(--panelhi); border:1px solid var(--line); border-radius:26px;
+  padding:6px; z-index:6; max-width:608px; margin:0 auto; }
+.nav button { flex:1; display:flex; align-items:center; justify-content:center;
+  gap:7px; border:0; background:none; color:var(--lo); font-size:13px;
+  font-weight:700; padding:12px 0; border-radius:20px; cursor:pointer; }
+.nav button.on { background:rgba(63,221,162,.16); color:var(--mint); flex:1.6; }
+
+.addrow { display:flex; gap:8px; margin:10px 0; }
+.addrow input { flex:1; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
+  background:var(--panelhi); color:var(--hi); font-size:14px; outline:none; }
+.addrow button, .big { background:var(--mint); color:var(--ink); border:0;
+  border-radius:12px; font-weight:800; padding:12px 18px; cursor:pointer; font-size:14px; }
+.big { display:block; width:100%; margin:10px 0; }
+.panel { background:var(--panel); border-radius:16px; padding:12px 14px; margin:10px 0; }
+.rrow { padding:5px 0; cursor:pointer; } .rrow.sel { font-weight:800; }
+.litem { background:var(--panel); border-radius:14px; padding:10px 12px; margin:8px 0;
+  position:relative; }
+.litem label { display:flex; align-items:center; gap:9px; font-weight:600; }
+.litem .done { text-decoration:line-through; color:var(--lo); }
+.litem > b { position:absolute; right:44px; top:12px; color:var(--mint); }
+.litem .x { position:absolute; right:10px; top:8px; background:none; border:0;
+  color:var(--lo); font-size:14px; cursor:pointer; padding:4px; }
+.litem .sub { font-size:12px; color:var(--lo); margin:5px 0 0 28px; cursor:pointer; }
+
+#modal { position:fixed; inset:0; background:rgba(4,7,10,.8); display:none;
+  z-index:10; overflow-y:auto; padding:24px 14px; }
+#modal.open { display:block; }
+#sheet { background:var(--panel); border-radius:22px; max-width:560px;
+  margin:0 auto; padding:18px; animation:pop .22s ease-out; }
+@keyframes pop { from { transform:scale(.94) translateY(8px); opacity:0; } }
+.dtop img { width:150px; height:150px; object-fit:contain; display:block;
+  margin:0 auto 10px; border-radius:14px; background:var(--panelhi); }
+#sheet h2 { font-size:16px; margin:6px 0; }
+#sheet h3 { font-size:11px; letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--lo); margin:18px 0 4px; padding-left:22px; position:relative; }
+#sheet h3::before { content:""; position:absolute; left:0; top:50%; width:14px;
+  height:2px; background:var(--mint); border-radius:1px; }
+.dprice { display:flex; align-items:baseline; gap:10px; margin:8px 0; flex-wrap:wrap; }
+.dprice b { font-size:26px; color:var(--mint); font-weight:900; }
+.dprice b.hot { color:var(--coral); }
+.dprice span, .dprice s { color:var(--lo); }
+.crow { background:var(--panelhi); border-radius:10px; padding:8px 10px; margin:5px 0;
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.crow.best { background:rgba(63,221,162,.10); }
+.crow .cn { flex-basis:100%; font-size:11px; color:var(--lo);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.crow b { margin-left:auto; }
+.crow small { color:var(--amber); }
+.mini { font-size:10.5px; color:var(--lo); }
+canvas { width:100%; display:block; }
+.dbtns { display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+.btn { display:block; text-align:center; background:rgba(63,221,162,.14);
+  color:var(--mint); border:1px solid rgba(63,221,162,.4); border-radius:13px;
+  padding:12px; font-weight:700; font-size:14px; text-decoration:none; cursor:pointer; }
+.btn.ghost { background:none; border-color:var(--line); color:var(--lo); }
+footer { text-align:center; color:var(--lo); font-size:11px; padding:18px 20px 8px; }
+footer b { color:var(--mint); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i><i></i><i></i><s></s><b></b></div>
+  <h1>ПРОМО РАДАР<small>всички намаления и официалните цени на България</small></h1>
+</header>
+<main id="view"></main>
+<footer>Уеб версия само за разглеждане. Пълното приложение — с известия при
+намаление, скенер и джаджа — е за <b>Android</b>.<br>
+На iPhone: Сподели → „Добави към Начален екран“, за да стои като приложение.</footer>
+<nav class="nav">
+  <button data-tab="today" class="on">🏷 Днес</button>
+  <button data-tab="list">🛒 Списък</button>
+</nav>
+<div id="modal"><div id="sheet"></div></div>
+<script>
+/* Промо Радар — уеб витрина върху същия фийд, който ползва приложението.
+   Логиката (търсене, категории, кошница) е пренесена 1:1 от Kotlin кода —
+   константите се генерират machinally от него, за да няма разминаване. */
+"use strict";
+
+const RULES=[["bebe", ["пелен", "бебеш", "бебе", "hipp", "bebelan", "адаптирано мляко", "залъгалк", "биберон", "aptamil", "milupa", "детска пижама", "детск"]], ["pet", ["за котки", "за кучета", "за куче", "за котка", "котешк", "кучешк", "whiskas", "pedigree", "friskies", "purina", "felix", "gourmet", "darling", "papion", "dante храна", "sunny cat", "beta pet", "mega pet", "my love храна", "k-carinura", "лакомство за"]], ["zamr", ["замразен", "заморозен", "сладолед", "джелато", "фризер"]], ["mlek", ["кисело мляко", "прясно мляко", "мляко", "сирен", "кашкавал", "извар", "яйц", "краве масло", "сметан", "айран", "айрян", "кефир", "йогурт", "моцарел", "фета", "маскарпон", "горгонзол", "гауда", "едам", "бурата", "страчатела", "пекорино", "скир", "катък", "activia", "danone"]], ["meso", ["кайма", "свинск", "пилеш", "телеш", "агнеш", "пуеш", "месо", "кебапч", "кюфте", "надени", "луканк", "салам", "шунк", "бекон", "суджук", "пастърм", "филе", "риба", "скумри", "сьомг", "пъстърв", "цац", "хек", " тон ", "миди", "скарид", "бут", "плешк", "врат", "ребра", "крил", "дроб", "шпек", "колбас", "карначе", "прошуто", "фует", "пиле", "ципура", "сафрид", "хайвер", "пастет", "русенско варено", "суши", "сандвич", "тарама", "taрама", "специалитет", "бирени пръчици", "спианата", "слайс"]], ["plod", ["ябълк", "банан", "портокал", "мандарин", "лимон", "грозде", "дин", "пъпеш", "круш", "праск", "кайси", "слив", "череш", "ягод", "малин", "боровинк", "киви", "ананас", "авокадо", "домат", "краставиц", "чушк", "чушлет", "пиперк", "картоф", "лук", "морков", "зеле", "тиквич", "патладж", "марул", "спанак", "броколи", "карфиол", "гъб", "магданоз", "копър", "плод", "зеленчук", "цвекло", "репичк", "целин", "джинджиф", "салата", "манго", "кокосов орех", "фурми", "смокин", "джакфрут"]], ["hlyab", ["хляб", "хлебч", "питк", "багет", "франзел", "кифл", "козунак", "тортил", "лаваш", "кора за баниц", "кори", "макарон", "спагет", "фиде", "паста ", "нудъл", "кускус", "лазан", "брашно", "мая ", "сухар", "препечен", "баниц", "геврек", "брецел", "земел", "чабата", "гризини", "талиатели", "тортелини", "равиоли", "пица", "тесто", "поничка", "донът", "мекиц", "закуска", "фарфале", "лингуини", "паеля", "милефолие", "миниснак", "пиадин", "пекарна"]], ["napit", ["вода", "сок", "нектар", "бира", "вино", "ракия", "водка", "уиски", "джин", " ром ", "мастик", "ликьор", "шампанск", "пенливо", "кола", "фанта", "спрайт", "швепс", "енергийн", "тоник", "лимонад", "студен чай", "кафе", "нескафе", "капучино", "еспресо", "какао", "чай", "узо", "сайдер", "аперитив", "гроздова", "prosecco", "pepsi", "coca-cola", "mirinda", "7-up", "комбуча", "сироп", "джезве", "ноар", "совиньон", "мерло", "шардоне", "каберне", "сира", "напитк", "пенлив", "кафемашин", "сокоизстискв"]], ["sladko", ["шоколад", "вафл", "бисквит", "бонбон", "дъвк", "желирани", "чипс", "снакс", "крекер", "солет", "пуканк", "ядк", "фъстъ", "бадем", "кашу", "лешник", "стафид", "торта", "сладк", "мъфин", "кроасан", "десерт", "халва", "тахан", "локум", " мед", "конфитюр", "мармалад", "слънчоглед", "орех", "семки", "семе", "кекс", "целувки", "бишкот", "чийзкейк", "кантучини", "попкек", "milka", "oreo", "kit-kat", "едамаме", "соленки", "брауни", "пудинг", "еклер", "курабийк"]], ["bakal", ["ориз", "боб", "леща", "нахут", "булгур", "киноа", "грах", "захар", " сол", "оцет", "олио", "зехтин", "мазнин", "подправк", "чубриц", "черен пипер", "червен пипер", "кимион", "канела", "ванилия", "бакпулвер", "кетчуп", "майонез", "горчиц", "лютениц", "консерв", "буркан", "туршия", "маслин", "царевиц", "фасул", "супа", "бульон", " сос", "песто", "хумус", "тофу", "веган", "гулаш", "готово ястие", "чия", "кленов", "ригатони", "антипасти", "таратор"]], ["higi", ["шампоан", "балсам", "душ гел", "сапун", "паста за зъби", "четка за зъби", "вода за уста", "конец за зъби", "дезодорант", "антиперспирант", "крем", "лосион", "серум", "маска за лице", "мицелар", "тоалетно мляко", "бръснач", "бръснене", "афтършейв", "афтършейф", "тампон", "превръзк", "фон дьо тен", "спирала", "червило", "гланц", "лак за нокти", "парфюм", "тоалетна вода", "слънцезащит", "spf", "лак за коса", "боя за коса", "мокри кърпи", "мокри кърпич", "козметични кърпич", "клечки за уши", "масажно масло", "масаж", "пила за пети", "пяна за вана", "део спрей", "гел за тяло", "спрей за тяло", "флуид тяло", "спрей за след слънце", "праймер", "блендер за грим", "хайлайтър", "бронзант", "руж", "влажни кърпич", "интимен", "интимни", "резервни ножчета", "резервна глава", "за коса", "за пети", "за крака", "за скалп", "за грим", "уред за прически", "първа помощ", "nivea", "oral-b", "sensodyne", "pantene", "taft", "str8", "borotalco", "ziaja", "lactacyd"]], ["dom", ["прах за пране", "перилен", "гел за пране", "за пране", "пранета", "омекотител", "препарат", "белин", "хлор", "почистващ", "почистване", "тоалетна хартия", "тоал. хартия", "салфетк", "носни кърпич", "кухненск", "фолио", "хартия за печене", "торби за смет", "торби за отпадъци", "чували", "гъб за съдове", "телен", "освежител", "ароматизатор", "инсектицид", "raid", "съдомиялна", "обезмаслител", "vanish", "domestos", "persil", "ariel", "somat", "finish", "medix", "wc ", "моп", "подочистачка", "метла", "кофа", "изтривалка", "стъклочистач", "кош за пране", "седалка за тоалетна", "четка за тоалетна", "домакински ръкавици", "попивателни", "микрофибър", "сушилник", "пожарогасител", "кош за боклук"]], ["teh", ["телевизор", "смартфон", "телефон", "пералня", "хладилник", "фурна", "печка", "климатик", "абсорбатор", "прахосмукачк", "ютия", "парогенератор", "сешоар", "машинка", "тример", "фритюрник", "скара", "мултикукър", "тостер", "миксер", "блендер", "водоструйк", "компресор", "зарядно", "батери", "usb", "разклонител", "удължител", "апарат", "уред", "трансмитер", "мултимедийна", "шевна машина", "ледогенератор", "трион", "точило", "стълба", "стелаж", "количка", "багажник", "велосипед", "стелки", "силиконов спрей", "течност за чистачки", "крушк", "лампа", "свещ", "кибрит", "тенджер", "тиган", "тава", "касерол", "гевгир", "ренде", "нож", "прибори", "чаши", "чаша", "чиния", "купа", "сервиз", "дъска", "мелничка", "черпак", "лъжица", "вилица", "шпатула", "чопър", "кутия с капак", "бретер", "термос", "дамаджана", "лепило", "табуретк", "стол", "маса", "шкаф", "етажерка", "закачалка", "легло", "матрак", "топматрак", "възглавниц", "завивка", "одеяло", "чаршаф", "калъфк", "покривало", "спален комплект", "хавлиен", "кърпа", "постелка", "халат", "пижама", "килим", "люлк", "въже", "конструктор", "играчк", "катерушка", "система за охлаждане", "вентклип", "антуриум", "бегония", "каланхое", "бромелия", "лавандула", "фикус", "сентполия", "платикодон", "котлон"]], ["dreh", ["тениск", "бермуд", "нощниц", "поло", "сутиен", "пола", "потник", "панталон", "блуза", "рокля", "чорап", "бельо", "шорти", "суитшърт", "яке", "обувк", "джапанк", "esmara"]]];
+const CATS=[["plod", "🥬", "Плодове и зеленчуци"], ["meso", "🥩", "Месо и риба"], ["mlek", "🥛", "Мляко и яйца"], ["hlyab", "🍞", "Хляб и тестени"], ["bakal", "🫙", "Бакалия"], ["napit", "🥤", "Напитки"], ["sladko", "🍫", "Сладко и солени"], ["zamr", "🧊", "Замразени"], ["higi", "🧴", "Козметика"], ["dom", "🧽", "Химия и хартия"], ["teh", "🍳", "Дом и техника"], ["dreh", "👕", "Дрехи"], ["pet", "🐾", "Домашни любимци"], ["bebe", "🍼", "Бебе"], ["drugo", "📦", "Друго"]];
+const STORE_COLORS={"кауфланд": "#E3000F", "лидл": "#0050AA", "билла": "#F3C300", "dm": "#3A6BC5", "фантастико": "#43B02A", "t-market": "#F07C00", "тмаркет": "#F07C00", "метро": "#0069B4", "lilly": "#E6007E", "cba": "#00A651", "ebag": "#EC6608", "bulmag": "#00A0DF", "кооп": "#2E8B57", "аванти": "#9B5DE5", "жанет": "#D62246", "триста": "#00B4A6", "класико": "#B07D2B"};
+
+
+const RAW = "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data";
+const BASES = [RAW + "/data", RAW + "/main"];
+const EUR = 1.95583;
+
+const fmt = v => v.toFixed(2);
+const eur = v => (v / EUR).toFixed(2);
+
+/* ---------- зареждане с резервен клон и кеш в паметта ---------- */
+const cache = {};
+async function feed(path) {
+  if (cache[path]) return cache[path];
+  for (const b of BASES) {
+    try {
+      const r = await fetch(b + "/" + path, { cache: "no-cache" });
+      if (r.ok) { const j = await r.json(); cache[path] = j; return j; }
+    } catch (e) { /* пробваме следващия клон */ }
+  }
+  return null;
+}
+
+/* ---------- търсене: огледало на DataFeed.matchScore ---------- */
+const MARKERS = new Set(["с","със","вкус","аромат","за","без","от","и","в","във","на","пълнеж","плънка"]);
+const UNITS = new Set(["г","гр","кг","мл","л","ml","g","kg","l","бр","броя","х","x","см","cm","%"]);
+const qWords = s => s.toLowerCase().split(/[^0-9a-zа-яё]+/)
+  .filter(w => w && !/^\d/.test(w) && !UNITS.has(w));
+const wordHit = (w, q) => w.startsWith(q) || (q.startsWith(w) && w.length >= 4);
+
+function matchScore(product, query) {
+  const pw = qWords(product);
+  if (!pw.length) return -1;
+  const qw = qWords(query).filter(w => w.length >= 3);
+  if (!qw.length) {
+    const q = query.trim().toLowerCase();
+    return (q.length >= 2 && pw.some(w => w.startsWith(q))) ? 0 : -1;
+  }
+  const single = qw.length === 1;
+  let worst = 0, first = 1e9;
+  for (const q of qw) {
+    let found = -1;
+    for (let i = 0; i < pw.length; i++) {
+      if (!wordHit(pw[i], q)) continue;
+      if (single && i > 0 && MARKERS.has(pw[i-1])) continue;
+      if (single && i > 3) continue;
+      found = i; break;
+    }
+    if (found < 0) return -1;
+    if (found > worst) worst = found;
+    if (found < first) first = found;
+  }
+  if (!single && first > 0 && MARKERS.has(pw[first-1])) return -1;
+  return worst;
+}
+
+const SRC_LABEL = { 1: "официална", 2: "от магазина" };
+
+function searchIn(items, query, limit = 80) {
+  const seen = new Set();
+  return items
+    .map(it => [it, matchScore(it.n, query)])
+    .filter(([it, sc]) => sc >= 0)
+    .sort((a, b) => a[1] - b[1]
+      || (a[0].u == null) - (b[0].u == null)
+      || (a[0].u ?? a[0].p) - (b[0].u ?? b[0].p))
+    .filter(([it]) => {
+      const k = it.s + "|" + it.n.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    })
+    .slice(0, limit)
+    .map(([it]) => it);
+}
+
+function pricesEverywhere(items, query) {
+  const per = {};
+  for (const h of searchIn(items, query, 300)) {
+    const k = h.s.toLowerCase();
+    const v = h.u ?? h.p;
+    if (!(k in per) || v < (per[k].u ?? per[k].p)) per[k] = h;
+  }
+  const rows = Object.values(per);
+  const withUnit = rows.filter(r => r.u != null).length;
+  return withUnit * 2 >= rows.length
+    ? rows.sort((a, b) => (a.u == null) - (b.u == null) || (a.u ?? 1e9) - (b.u ?? 1e9) || a.p - b.p)
+    : rows.sort((a, b) => a.p - b.p);
+}
+
+/* ---------- категории: огледало на Categories.of ---------- */
+const ING = new Set(["с","със","от","вкус","аромат"]);
+function tokenize(name) {
+  return name
+    .replace(/(?<=[a-zа-яё])(?=[A-ZА-ЯЁ])/g, " ")
+    .replace(/(?<=[a-z])(?=[а-яё])|(?<=[а-яё])(?=[a-z])/g, " ")
+    .replace(/(?<=[A-Za-zА-Яа-яЁё])(?=\d)|(?<=\d)(?=[A-Za-zА-Яа-яЁё])/g, " ")
+    .toLowerCase().split(/[^0-9a-zа-яё]+/).filter(Boolean);
+}
+function catOf(name) {
+  const low = name.toLowerCase();
+  const words = tokenize(name);
+  if (!words.length) return "drugo";
+  let bc = "", bi = 1e9, bs = -1;
+  const offer = (c, i, s) => { if (i < bi || (i === bi && s > bs)) { bc = c; bi = i; bs = s; } };
+  for (const [cat, stems] of RULES) for (const stem of stems) {
+    const t = stem.trim();
+    if (/[^a-zа-яё ]/.test(t)) { if (low.includes(t)) offer(cat, 1, t.length); continue; }
+    const exact = stem !== t;
+    const parts = t.split(" ");
+    let done = false;
+    for (let i = 0; i <= words.length - parts.length; i++) {
+      let ok = true;
+      for (let j = 0; j < parts.length; j++) {
+        const w = words[i + j], p = parts[j];
+        if (exact ? w !== p : !(w.startsWith(p) && (p.length >= 5 || w.length <= p.length + 3))) { ok = false; break; }
+      }
+      if (!ok) continue;
+      if (i === 0 || !ING.has(words[i-1])) { offer(cat, i, t.replace(/ /g, "").length); done = true; }
+      break;
+    }
+    if (!done && parts.length === 1 && parts[0].length >= 4) {
+      for (let i = 0; i < words.length; i++) {
+        if (words[i].includes(parts[0]) && !/\d/.test(words[i])) {
+          if (i === 0 || !ING.has(words[i-1])) offer(cat, i, parts[0].length - 1);
+          break;
+        }
+      }
+    }
+  }
+  return bs >= 0 ? bc : "drugo";
+}
+const catMeta = id => CATS.find(c => c[0] === id) || [id, "📦", id];
+
+/* ---------- цвят на веригата: огледало на StoreColor ---------- */
+const FALLBACK = ["#6EC1E4","#E4A76E","#9DE46E","#E46EC1","#6E7BE4","#E4D96E","#6EE4C1","#C16EE4"];
+function storeColor(store) {
+  const key = store.toLowerCase().split(" (")[0].trim();
+  if (STORE_COLORS[key]) return STORE_COLORS[key];
+  for (const k in STORE_COLORS) if (key.startsWith(k)) return STORE_COLORS[k];
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.codePointAt(0)) | 0;
+  return FALLBACK[(h & 0x7fffffff) % FALLBACK.length];
+}
+
+/* ---------- състояние ---------- */
+const S = {
+  idx: null, all: [], search: null, history: null,
+  store: null, cat: null, byUnit: false, more: false,
+  tab: "today", query: "",
+  list: JSON.parse(localStorage.getItem("pr_list") || "[]"),
+  checked: new Set(JSON.parse(localStorage.getItem("pr_checked") || "[]")),
+  ranking: null, perItem: null, chosen: null,
+};
+const saveList = () => {
+  localStorage.setItem("pr_list", JSON.stringify(S.list));
+  localStorage.setItem("pr_checked", JSON.stringify([...S.checked]));
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const discountPct = o => {
+  if (o.pct >= 1 && o.pct <= 95) return o.pct;
+  if (o.old && o.old > o.price && o.price > 0) return Math.round((1 - o.price / o.old) * 100);
+  return null;
+};
+const unitText = o => (o.unitPrice != null && o.unitLabel) ? fmt(o.unitPrice) + " " + o.unitLabel : "";
+
+/* ---------- зареждане ---------- */
+async function boot() {
+  S.idx = await feed("feed/index.json");
+  render();
+  if (!S.idx) return;
+  const acc = [];
+  for (const st of S.idx.stores) {
+    const f = await feed("feed/offers-" + st.slug + ".json");
+    if (f && f.offers) acc.push(...f.offers.filter(o => !isJunk(o)));
+    S.all = acc; render();
+  }
+  feed("feed/search.json").then(f => { S.search = f ? f.items : []; });
+  feed("feed/history.json").then(f => { S.history = f; });
+}
+const JUNK = /^\s*(тествай|печеливш|тест на продукт|играй|спечели|томбола|виж повече|научи повече|седмични предложени|нови продукти|всички продукти|разгледай|каталог|брошура|абонирай|информация за продукт|налично за доставка|не е налично|кошница с грижа|\d+([.,]\d+)?\s*(пране|бр|броя|г|гр|кг|мл|л|ml|g|kg|l)\b)/i;
+const isJunk = o => !o.name || o.name.trim().length < 3 || JUNK.test(o.name)
+  || o.name.includes("/опаковка") || !(o.price > 0) || o.price > 5000
+  || !/[A-Za-zА-Яа-я]{3}/.test(o.name);
+
+/* ---------- изгледи ---------- */
+function render() {
+  $("view").innerHTML = S.tab === "today" ? viewToday() : viewList();
+  document.querySelectorAll(".nav button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === S.tab));
+  bind();
+}
+
+function offerCard(o) {
+  const pct = discountPct(o), ut = unitText(o), c = storeColor(o.store);
+  return `<div class="card" data-open="${esc(JSON.stringify({ t: "offer", s: o.store, n: o.name })).replace(/'/g, "&#39;")}">
+    <div class="bar" style="background:${c}"></div>
+    ${o.img ? `<img loading="lazy" src="${esc(o.img)}" alt="">` : `<div class="noimg" style="color:${c}">${esc(o.store.slice(0, 2).toUpperCase())}</div>`}
+    <div class="mid">
+      <div class="tag" style="color:${c}"><i style="background:${c}"></i>${esc(o.store.toUpperCase())}</div>
+      <div class="nm">${esc(o.name)}</div>
+      ${ut ? `<span class="pill amber">${ut}</span>` : ""}
+    </div>
+    <div class="pr">
+      ${pct ? `<span class="badge">−${pct}%</span>` : ""}
+      ${o.old ? `<s>${fmt(o.old)} лв</s>` : ""}
+      <b class="${pct ? "hot" : ""}">${fmt(o.price)}<em>лв</em></b>
+      <small>${eur(o.price)} €</small>
+    </div>
+  </div>`;
+}
+
+function hitRow(h) {
+  const c = storeColor(h.s);
+  const lbl = SRC_LABEL[h.f] || "";
+  const ut = (h.u != null && h.l) ? fmt(h.u) + " " + h.l : "";
+  return `<div class="card slim" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n })).replace(/'/g, "&#39;")}">
+    <div class="bar" style="background:${c}"></div>
+    <div class="mid">
+      <div class="tag" style="color:${c}"><i style="background:${c}"></i>${esc(h.s.toUpperCase())}
+        ${lbl ? `<span class="pill violet">${lbl}</span>` : ""}</div>
+      <div class="nm">${esc(h.n)}</div>
+      ${ut ? `<span class="pill amber">${ut}</span>` : ""}
+    </div>
+    <div class="pr">
+      ${h.o ? `<s>${fmt(h.o)} лв</s>` : ""}
+      <b>${fmt(h.p)}<em>лв</em></b><small>${eur(h.p)} €</small>
+    </div>
+  </div>`;
+}
+
+function viewToday() {
+  if (!S.idx) return `<div class="note">Зареждам фийда… Ако това не изчезне, провери връзката.</div>`;
+  const q = S.query.trim();
+
+  let head = `<div class="search"><input id="q" type="search" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
+
+  if (q.length >= 2) {
+    if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
+    const res = searchIn(S.search, q);
+    return head + (res.length
+      ? `<div class="note">${res.length} резултата · подредени по цена за единица</div>` + res.map(hitRow).join("")
+      : `<div class="empty"><b>Нищо за „${esc(q)}“</b><p>Пробвай по-обща дума — „мляко“ вместо „прясно мляко Верея 3%“.</p></div>`);
+  }
+
+  const stores = S.idx.stores.map(s => s.name);
+  const extra = (S.idx.chains || []).filter(c => !stores.includes(c));
+  const known = ["Билла","Метро","Фантастико","T-Market","Lilly","BulMag","КООП","ТРИСТА","Жанет","Аванти","Лекси","Класико"];
+  extra.sort((a, b) => {
+    const ia = known.indexOf(a), ib = known.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, "bg");
+  });
+
+  const officialOnly = S.store && !stores.includes(S.store);
+
+  let chips = `<div class="chips">` +
+    chip("Всички", !S.store, "st:") +
+    S.idx.stores.map(s => chip(s.name + ` <u>${s.count}</u>`, S.store === s.name, "st:" + s.name, storeColor(s.name))).join("") +
+    chip("за единица", S.byUnit, "unit:", "#F7C266") +
+    (extra.length ? (
+      (S.more ? extra : extra.filter(c => c === S.store))
+        .map(c => chip(c, S.store === c, "st:" + c, storeColor(c))).join("") +
+      chip(S.more ? "скрий ▴" : "още вериги ▾", false, "more:", "#A695F2")
+    ) : "") + `</div>`;
+
+  let rows, names;
+  if (officialOnly) {
+    if (!S.search) return head + chips + `<div class="note">Зареждам цените…</div>`;
+    rows = S.search.filter(it => it.s === S.store);
+    names = rows.map(r => r.n);
+  } else {
+    rows = S.all.filter(o => !S.store || o.store === S.store);
+    names = rows.map(r => r.name);
+  }
+
+  const present = {};
+  for (const n of names) { const c = catOf(n); present[c] = (present[c] || 0) + 1; }
+  const catsBar = `<div class="chips cats">` + CATS
+    .filter(c => present[c[0]])
+    .sort((a, b) => present[b[0]] - present[a[0]])
+    .map(c => `<button class="cat ${S.cat === c[0] ? "on" : ""}" data-act="cat:${c[0]}">
+      <span>${c[1]}</span>${esc(c[2])}<u>${present[c[0]]}</u></button>`).join("") + `</div>`;
+
+  if (officialOnly) {
+    let list = rows.filter(r => !S.cat || catOf(r.n) === S.cat);
+    list = S.byUnit ? list.filter(r => r.u != null).sort((a, b) => a.u - b.u)
+                    : list.sort((a, b) => a.p - b.p);
+    return head + chips + catsBar +
+      `<div class="note"><b>${list.length} цени в ${esc(S.store)}</b> — редовни цени от официалните данни на КЗП, не промоции.</div>` +
+      list.slice(0, 400).map(hitRow).join("");
+  }
+
+  let list = rows.filter(o => !S.cat || catOf(o.name) === S.cat);
+  list = S.byUnit ? list.filter(o => o.unitPrice != null).sort((a, b) => a.unitPrice - b.unitPrice)
+                  : list.sort((a, b) => (discountPct(b) || 0) - (discountPct(a) || 0));
+  const upd = S.idx.updated ? `<div class="note">${list.length} намаления · данните са от ${esc(S.idx.updated)}</div>` : "";
+  return head + chips + catsBar + upd +
+    (list.length ? list.slice(0, 600).map(offerCard).join("")
+      : `<div class="empty"><b>Още зареждам офертите…</b></div>`);
+}
+
+const chip = (label, on, act, color) =>
+  `<button class="chip ${on ? "on" : ""}" data-act="${esc(act)}" ${color ? `style="--c:${color}"` : ""}>${label}</button>`;
+
+/* ---------- кошницата ---------- */
+function viewList() {
+  const items = S.list;
+  let html = `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
+  <div class="addrow"><input id="newitem" placeholder="напр. „мляко“, „яйца“, „кайма“"><button data-act="add:">Добави</button></div>`;
+  if (!items.length) return html + `<div class="empty"><b>Списъкът е празен</b><p>Добави продукти и натисни „Къде е най-евтино?“.</p></div>`;
+  html += `<button class="big" data-act="rank:">🧮 Къде е най-евтино?</button>`;
+
+  if (S.ranking) {
+    const r = S.ranking;
+    html += `<div class="panel"><b>🏆 Кошницата по вериги</b>` +
+      r.slice(0, 6).map(([chain, sum, cnt], i) =>
+        `<div class="rrow ${chain === S.chosen ? "sel" : ""}" data-act="chain:${esc(chain)}">
+          ${i === 0 ? "🥇" : (i + 1) + "."} <span style="color:${storeColor(chain)}">${esc(chain)}</span>
+          — ${fmt(sum)} лв · ${cnt}/${items.length} артикула</div>`).join("") + `</div>`;
+  }
+
+  for (const it of items) {
+    const done = S.checked.has(it);
+    const rows = S.perItem ? (S.perItem[it] || []) : [];
+    const inChosen = rows.find(h => h.s === S.chosen);
+    html += `<div class="litem">
+      <label><input type="checkbox" data-act="chk:${esc(it)}" ${done ? "checked" : ""}>
+        <span class="${done ? "done" : ""}">${esc(it)}</span></label>
+      ${inChosen ? `<b>${fmt(inChosen.p)} лв</b>` : ""}
+      <button class="x" data-act="del:${esc(it)}">✕</button>
+      ${rows.slice(0, 3).map(h => `<div class="sub" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n })).replace(/'/g, "&#39;")}">
+          <span style="color:${storeColor(h.s)}">${esc(h.s)}</span> ${fmt(h.p)} лв — ${esc(h.n.slice(0, 38))}</div>`).join("")}
+    </div>`;
+  }
+  if (S.chosen && S.perItem) {
+    const total = items.reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
+    const taken = items.filter(i => S.checked.has(i))
+      .reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
+    html += `<div class="panel"><b>🛒 ${esc(S.chosen)}</b><div>взети ${fmt(taken)} от ${fmt(total)} лв</div></div>`;
+  }
+  return html;
+}
+
+async function rank() {
+  if (!S.search) { S.search = (await feed("feed/search.json"))?.items || []; }
+  const per = {};
+  for (const it of S.list) {
+    const bystore = {};
+    for (const h of searchIn(S.search, it, 400)) {
+      if (!(h.s in bystore) || h.p < bystore[h.s].p) bystore[h.s] = h;
+    }
+    per[it] = Object.values(bystore).sort((a, b) => a.p - b.p);
+  }
+  const totals = {};
+  for (const it of S.list) for (const h of per[it]) {
+    totals[h.s] = totals[h.s] || [0, 0];
+    totals[h.s][0] += h.p; totals[h.s][1]++;
+  }
+  S.perItem = per;
+  S.ranking = Object.entries(totals).map(([c, [s, n]]) => [c, s, n])
+    .sort((a, b) => b[2] - a[2] || a[1] - b[1]);
+  S.chosen = S.ranking[0]?.[0] || null;
+  render();
+}
+
+/* ---------- детайл ---------- */
+async function openDetail(ref) {
+  const o = ref.t === "offer"
+    ? S.all.find(x => x.store === ref.s && x.name === ref.n)
+    : null;
+  const base = o || S.search?.find(x => x.s === ref.s && x.n === ref.n);
+  if (!base) return;
+  const name = o ? o.name : base.n, store = o ? o.store : base.s;
+  const price = o ? o.price : base.p, old = o ? o.old : base.o;
+  const pct = o ? discountPct(o) : (old && old > price ? Math.round((1 - price / old) * 100) : null);
+  const ut = o ? unitText(o) : ((base.u != null && base.l) ? fmt(base.u) + " " + base.l : "");
+
+  let html = `<div class="dtop">
+    ${o && o.img ? `<img src="${esc(o.img)}" alt="">` : ""}
+    <div class="tag" style="color:${storeColor(store)}"><i style="background:${storeColor(store)}"></i>${esc(store.toUpperCase())}</div>
+    <h2>${esc(name)}</h2>
+    <div class="dprice"><b class="${pct ? "hot" : ""}">${fmt(price)} лв</b><span>${eur(price)} €</span>
+      ${old ? `<s>${fmt(old)} лв</s>` : ""}${pct ? `<span class="badge">−${pct}%</span>` : ""}</div>
+    ${ut ? `<div class="pill amber">${ut}</div>` : ""}
+  </div>`;
+
+  const kw = name.split(/[\s,()]+/).filter(w => w.length >= 3 && !/\d/.test(w)).slice(0, 2).join(" ") || name.slice(0, 20);
+  if (S.search) {
+    const ev = pricesEverywhere(S.search, kw);
+    if (ev.length >= 2) {
+      const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
+      html += `<h3>Цените навсякъде</h3>
+      <div class="note">в ${ev.length} вериги · от ${fmt(lo)} до ${fmt(hi)} лв · подобни продукти по „${esc(kw)}“</div>` +
+        ev.slice(0, 7).map((h, i) => `<div class="crow ${i === 0 ? "best" : ""} ${h.s === store ? "cur" : ""}">
+          <span class="tag" style="color:${storeColor(h.s)}"><i style="background:${storeColor(h.s)}"></i>${esc(h.s.toUpperCase())}</span>
+          ${i === 0 ? '<span class="pill mintf">най-евтино</span>' : ""}
+          ${h.s === store ? '<span class="mini">← гледаш това</span>' : ""}
+          <div class="cn">${esc(h.n)}</div>
+          <b>${fmt(h.p)} лв</b>${(h.u != null && h.l) ? `<small>${fmt(h.u)} ${h.l}</small>` : ""}
+        </div>`).join("");
+    }
+  }
+
+  if (S.history) {
+    const key = store.trim().toLowerCase() + "|" + name.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 60);
+    const h = S.history.h && S.history.h[key];
+    if (h && h.p.length >= 2) {
+      html += `<h3>История на цената</h3><canvas id="chart" height="130"></canvas>
+        <div class="note">${h.d[0]} → ${h.d[h.d.length - 1]} · всяка точка е засечена промяна</div>`;
+      setTimeout(() => drawChart(h), 30);
+    } else if (h) {
+      html += `<div class="note">История: следим тази цена от ${h.d[0]} — графиката се появява при първата промяна.</div>`;
+    }
+  }
+
+  html += `<div class="dbtns">
+    ${o && o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">🔗 Виж в сайта на магазина</a>` : ""}
+    <button class="btn" data-share="${esc(name)}|${fmt(price)}|${esc(store)}${pct ? "|" + pct : ""}">📤 Сподели</button>
+    <button class="btn ghost" data-close>Затвори</button>
+  </div>`;
+
+  $("sheet").innerHTML = html;
+  $("modal").classList.add("open");
+}
+
+function drawChart(h) {
+  const cv = $("chart"); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = 130;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const min = Math.min(...h.p), max = Math.max(...h.p);
+  const span = Math.max(max - min, 0.01);
+  const X = i => 8 + (W - 16) * i / (h.p.length - 1);
+  const Y = p => 10 + (H - 30) * (1 - (p - min) / span);
+  g.strokeStyle = "#374551"; g.lineWidth = 1;
+  for (let i = 0; i <= 2; i++) { g.beginPath(); g.moveTo(0, 10 + (H - 30) * i / 2); g.lineTo(W, 10 + (H - 30) * i / 2); g.stroke(); }
+  g.strokeStyle = "#3FDDA2"; g.lineWidth = 3; g.lineJoin = "round"; g.beginPath();
+  h.p.forEach((p, i) => i ? g.lineTo(X(i), Y(p)) : g.moveTo(X(i), Y(p)));
+  g.stroke();
+  const grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "rgba(63,221,162,.28)"); grad.addColorStop(1, "rgba(63,221,162,0)");
+  g.lineTo(X(h.p.length - 1), H); g.lineTo(X(0), H); g.closePath(); g.fillStyle = grad; g.fill();
+  g.fillStyle = "#3FDDA2";
+  h.p.forEach((p, i) => { g.beginPath(); g.arc(X(i), Y(p), 4, 0, 7); g.fill(); });
+  g.fillStyle = "#95A4B1"; g.font = "11px system-ui";
+  g.fillText("макс " + fmt(max), 8, 9); g.fillText("мин " + fmt(min), 8, H - 3);
+}
+
+/* ---------- събития ---------- */
+function bind() {
+  const q = $("q");
+  if (q) q.oninput = () => { S.query = q.value; renderKeepFocus(); };
+  const ni = $("newitem");
+  if (ni) ni.onkeydown = e => { if (e.key === "Enter") addItem(); };
+}
+function renderKeepFocus() {
+  const pos = $("q")?.selectionStart;
+  render();
+  const q = $("q");
+  if (q) { q.focus(); if (pos != null) q.setSelectionRange(pos, pos); }
+}
+function addItem() {
+  const v = $("newitem")?.value.trim();
+  if (v && !S.list.includes(v)) { S.list.push(v); S.ranking = null; saveList(); }
+  render();
+}
+
+document.addEventListener("click", e => {
+  const open = e.target.closest("[data-open]");
+  if (open) { openDetail(JSON.parse(open.dataset.open)); return; }
+  if (e.target.closest("[data-close]") || e.target.id === "modal") {
+    $("modal").classList.remove("open"); return;
+  }
+  const sh = e.target.closest("[data-share]");
+  if (sh) {
+    const [n, p, st, pct] = sh.dataset.share.split("|");
+    const txt = `🔥 ${n}\n${p} лв${pct ? " (−" + pct + "%)" : ""} — ${st}\n\n📡 Намерено с Промо Радар`;
+    if (navigator.share) navigator.share({ text: txt }).catch(() => {});
+    else { navigator.clipboard?.writeText(txt); sh.textContent = "✓ Копирано"; }
+    return;
+  }
+  const nav = e.target.closest(".nav button");
+  if (nav) { S.tab = nav.dataset.tab; render(); return; }
+  const act = e.target.closest("[data-act]");
+  if (!act) return;
+  const [cmd, arg] = act.dataset.act.split(/:(.*)/);
+  if (cmd === "st") { S.store = arg || null; S.more = false; S.cat = null; }
+  if (cmd === "more") S.more = !S.more;
+  if (cmd === "unit") S.byUnit = !S.byUnit;
+  if (cmd === "cat") S.cat = S.cat === arg ? null : arg;
+  if (cmd === "add") { addItem(); return; }
+  if (cmd === "rank") { rank(); return; }
+  if (cmd === "chain") S.chosen = arg;
+  if (cmd === "del") { S.list = S.list.filter(x => x !== arg); S.checked.delete(arg); S.ranking = null; saveList(); }
+  if (cmd === "chk") { S.checked.has(arg) ? S.checked.delete(arg) : S.checked.add(arg); saveList(); }
+  render();
+});
+
+boot();
+
+</script>
+</body>
+</html>
