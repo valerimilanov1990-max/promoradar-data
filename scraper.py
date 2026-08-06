@@ -1720,6 +1720,131 @@ def build_history():
                                f"наследени {len(prev)}")
 
 
+# ---------------------------------------------------------------------------
+# Локациите на магазините — за „вериги наблизо“ в приложението
+# ---------------------------------------------------------------------------
+#
+# Източникът е OpenStreetMap (Overpass API): безплатен, без ключ, с добро
+# покритие на веригите в България. Големите марки се разпознават по
+# псевдоними (Kaufland → Кауфланд), кварталните — по точно съвпадение на
+# името с верига от официалните данни. При недостъпен Overpass се наследява
+# предишният файл — както при историята, локациите не се губят от един
+# неуспешен опит. Координатите са с 4 знака (~11 м) — файлът остава малък.
+
+GEO_ALIASES = {
+    "Кауфланд": ["kaufland"],
+    "Лидл": ["lidl"],
+    "Билла": ["billa"],
+    "Метро": ["metro", "метро"],
+    "Фантастико": ["fantastico", "фантастико"],
+    "T-Market": ["t market", "t-market", "т маркет", "т-маркет", "tmarket"],
+    "dm": ["dm", "dm drogerie markt", "dm-drogerie markt"],
+    "Lilly": ["lilly", "lilly drogerie", "лили", "лили дрогерие"],
+    "BulMag": ["bulmag", "булмаг"],
+    "КООП": ["кооп", "coop"],
+    "Аванти": ["аванти", "avanti"],
+    "ТРИСТА": ["триста", "магазини 345", "345"],
+    "Жанет": ["жанет"],
+    "Болеро": ["болеро"],
+    "Макс": ["макс маркет"],
+}
+
+def _geo_norm(s):
+    s = re.sub(r"[\"'„“”]+", "", s.lower())
+    s = re.sub(r"[\s\-–—]+", " ", s).strip()
+    return re.sub(r"^(супермаркет|магазин|магазини|market|супермаркети)\s+", "", s)
+
+def _geo_prev():
+    base = CFG.get("feed_raw_base", "").rstrip("/")
+    if not base:
+        return {}
+    for br in ("data", "main"):
+        try:
+            r = requests.get(f"{base}/{br}/feed/stores-geo.json", timeout=30)
+            if r.ok:
+                return r.json().get("chains", {})
+        except Exception:
+            pass
+    return {}
+
+def build_geo():
+    chains = ({o["store"] for o in OUT["offers"]}
+              | {b["chain"] for b in OUT["basics"]}
+              | {"Билла", "Метро", "Фантастико", "T-Market", "Lilly"})
+    # нормализирано име → име на верига, както го знае приложението
+    lookup = {}
+    for c in chains:
+        lookup[_geo_norm(c)] = c
+    for c, aliases in GEO_ALIASES.items():
+        for a in aliases:
+            lookup[_geo_norm(a)] = c
+
+    query = """
+[out:json][timeout:120];
+area["ISO3166-1"="BG"][admin_level=2]->.bg;
+nwr["shop"~"supermarket|chemist|convenience|discount|greengrocer|variety_store"](area.bg);
+out center tags;
+"""
+    elements = None
+    for host in ("https://overpass-api.de/api/interpreter",
+                 "https://overpass.kumi.systems/api/interpreter"):
+        try:
+            r = requests.post(host, data={"data": query}, timeout=180,
+                              headers={"User-Agent": "PromoRadar/1.0"})
+            if r.ok:
+                elements = r.json().get("elements", [])
+                break
+            note("гео", f"{host}: HTTP {r.status_code}")
+        except Exception as e:
+            note("гео", f"{host}: {type(e).__name__}: {e}")
+
+    if elements is None:
+        prev = _geo_prev()
+        if prev:
+            OUT["geo"] = prev
+            OUT["stats"]["гео"] = (f"Overpass недостъпен — наследени "
+                                   f"{sum(len(v) for v in prev.values())} "
+                                   f"магазина от предишния фийд")
+        else:
+            note("гео", "Overpass недостъпен и няма предишен файл")
+        return
+
+    by_chain = {}
+    for el in elements:
+        tags = el.get("tags", {})
+        lat = el.get("lat") or el.get("center", {}).get("lat")
+        lon = el.get("lon") or el.get("center", {}).get("lon")
+        if lat is None or lon is None:
+            continue
+        chain = None
+        for key in ("brand", "name", "operator"):
+            v = tags.get(key)
+            if v and _geo_norm(v) in lookup:
+                chain = lookup[_geo_norm(v)]
+                break
+        if chain is None:
+            continue
+        by_chain.setdefault(chain, []).append(
+            [round(float(lat), 4), round(float(lon), 4)])
+
+    # дедупликация на съседни точки (двойни записи в OSM) и разумен таван
+    for c, pts in by_chain.items():
+        seen, ded = set(), []
+        for p in pts:
+            k = (round(p[0], 3), round(p[1], 3))  # ~110 м клетка
+            if k not in seen:
+                seen.add(k)
+                ded.append(p)
+        by_chain[c] = ded[:500]
+
+    if not by_chain:
+        note("гео", f"нито един от {len(elements)} OSM обекта не съвпадна с верига")
+        return
+    OUT["geo"] = by_chain
+    OUT["stats"]["гео"] = (f"{sum(len(v) for v in by_chain.values())} магазина "
+                           f"в {len(by_chain)} вериги от {len(elements)} OSM обекта")
+
+
 def write_output():
     """Пише разделен фийд + пълния файл за съвместимост.
 
@@ -1763,6 +1888,12 @@ def write_output():
         sizes["history"] = _dump("feed/history.json",
                                  {"updated": OUT["updated"],
                                   "h": OUT["history"]})
+
+    # --- локациите на магазините (за „вериги наблизо“) ---
+    if OUT.get("geo"):
+        sizes["stores-geo"] = _dump("feed/stores-geo.json",
+                                    {"updated": OUT["updated"],
+                                     "chains": OUT["geo"]})
 
     # --- компактен индекс за търсене (кратки ключове = малък файл) ---
     idx = []
@@ -1840,6 +1971,7 @@ def main():
     scrape_community()
     scrape_reports()
     build_history()
+    build_geo()
 
     OUT["stats"]["време общо"] = f"{elapsed_min():.1f} мин"
     OUT["stats"]["offers_total"] = len(OUT["offers"])

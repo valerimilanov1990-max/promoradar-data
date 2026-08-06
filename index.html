@@ -452,10 +452,20 @@ function viewToday() {
       : `<div class="empty"><b>Нищо за „${esc(q)}“</b><p>Пробвай по-обща дума — „мляко“ вместо „прясно мляко Верея 3%“.</p></div>`);
   }
 
-  const stores = S.idx.stores.map(s => s.name);
-  const extra = (S.idx.chains || []).filter(c => !stores.includes(c));
+  // „Наблизо“: разстояние до най-близкия магазин на всяка верига;
+  // веригите извън радиуса изчезват от лентата. Без данни в OSM = остава.
+  const far = c => S.nearOnly && S.geoKm && S.geoKm[c] != null && S.geoKm[c] > NEAR_RADIUS;
+  const kmTag = c => (S.geoKm && S.geoKm[c] != null && S.geoKm[c] <= NEAR_RADIUS)
+    ? " · " + fmtKm(S.geoKm[c]) : "";
+
+  const stores = S.idx.stores.map(s => s.name).filter(c => !far(c));
+  const extra = (S.idx.chains || []).filter(c => !stores.includes(c) && !far(c));
   const known = ["Билла","Метро","Фантастико","T-Market","Lilly","BulMag","КООП","ТРИСТА","Жанет","Аванти","Лекси","Класико"];
   extra.sort((a, b) => {
+    if (S.geoKm) {
+      const ka = S.geoKm[a] ?? 9999, kb = S.geoKm[b] ?? 9999;
+      if (ka !== kb) return ka - kb;
+    }
     const ia = known.indexOf(a), ib = known.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, "bg");
   });
@@ -464,11 +474,12 @@ function viewToday() {
 
   let chips = `<div class="chips">` +
     chip("Всички", !S.store, "st:") +
-    S.idx.stores.map(s => chip(s.name + ` <u>${s.count}</u>`, S.store === s.name, "st:" + s.name, storeColor(s.name))).join("") +
+    S.idx.stores.filter(s => !far(s.name)).map(s => chip(esc(s.name + kmTag(s.name)) + ` <u>${s.count}</u>`, S.store === s.name, "st:" + s.name, storeColor(s.name))).join("") +
     chip("за единица", S.byUnit, "unit:", "#F7C266") +
+    chip(S.nearOnly ? "📍 наблизо ✓" : "📍 наблизо", S.nearOnly, "near:", "#3FDDA2") +
     (extra.length ? (
       (S.more ? extra : extra.filter(c => c === S.store))
-        .map(c => chip(c, S.store === c, "st:" + c, storeColor(c))).join("") +
+        .map(c => chip(esc(c + kmTag(c)), S.store === c, "st:" + c, storeColor(c))).join("") +
       chip(S.more ? "скрий ▴" : "още вериги ▾", false, "more:", "#A695F2")
     ) : "") + `</div>`;
 
@@ -510,6 +521,35 @@ function viewToday() {
 
 const chip = (label, on, act, color) =>
   `<button class="chip ${on ? "on" : ""}" data-act="${esc(act)}" ${color ? `style="--c:${color}"` : ""}>${label}</button>`;
+
+/* ---------- наблизо ---------- */
+const NEAR_RADIUS = 20; // км
+const fmtKm = km => km < 1 ? "под 1 км" : km < 10 ? km.toFixed(1) + " км" : Math.round(km) + " км";
+function haversineKm(la1, lo1, la2, lo2) {
+  const r = Math.PI / 180, dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(a));
+}
+async function toggleNear() {
+  if (S.nearOnly) { S.nearOnly = false; render(); return; }
+  if (!navigator.geolocation) { console.warn("няма геолокация"); return; }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const g = S.geoFeed || (S.geoFeed = await feed("feed/stores-geo.json"));
+      const { latitude: la, longitude: lo } = pos.coords;
+      const km = {};
+      for (const [chain, pts] of Object.entries(g.chains || {})) {
+        let best = Infinity;
+        for (const p of pts) best = Math.min(best, haversineKm(la, lo, p[0], p[1]));
+        if (best < Infinity) km[chain] = best;
+      }
+      S.geoKm = km; S.nearOnly = true;
+    } catch (e) {
+      S.geoKm = null;
+    }
+    render();
+  }, () => render(), { maximumAge: 600000, timeout: 8000 });
+}
 
 /* ---------- кошницата ---------- */
 function viewList() {
@@ -772,6 +812,7 @@ document.addEventListener("click", e => {
   if (cmd === "st") { S.store = arg || null; S.more = false; S.cat = null; }
   if (cmd === "more") S.more = !S.more;
   if (cmd === "unit") S.byUnit = !S.byUnit;
+  if (cmd === "near") { toggleNear(); return; }
   if (cmd === "cat") S.cat = S.cat === arg ? null : arg;
   if (cmd === "add") { addItem(); return; }
   if (cmd === "rank") { rank(); return; }
