@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Промо Радар — всички намаления и официалните цени</title>
 <meta name="description" content="Намаленията от всички вериги и официалните дневни цени на България, на едно място. Безплатно, без реклами.">
-<meta name="theme-color" content="#13372E">
+<meta name="theme-color" content="#13372E" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#DFF3EA" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Промо Радар">
@@ -18,13 +19,31 @@
   --ink:#131A22; --panel:#1E2832; --panelhi:#2A3641; --line:#374551;
   --hi:#E4EBF1; --lo:#95A4B1; --mint:#3FDDA2; --coral:#FF7A7A;
   --amber:#F7C266; --violet:#A695F2;
+  --mint16:rgba(63,221,162,.16); --mint55:rgba(63,221,162,.55);
+  --herobg:linear-gradient(100deg,#13372E,#152736,#231B4A);
+  --heroon:#FFFFFF; --herosub:rgba(63,221,162,.65);
+}
+/* Тема като телефона: същата премерена светла палитра като приложението
+   (мента 5.0:1, текст 16.6:1 върху бяло) — включва се сама. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --ink:#F5F7FB; --panel:#FFFFFF; --panelhi:#EEF2F8; --line:#E1E8F0;
+    --hi:#12202B; --lo:#55677A; --mint:#00805A; --coral:#C41E2E;
+    --amber:#8A5B00; --violet:#5B46C8;
+    --mint16:rgba(0,128,90,.12); --mint55:rgba(0,128,90,.5);
+    --herobg:linear-gradient(100deg,#DFF3EA,#E9F1FF,#F3EEFF);
+    --heroon:#123528; --herosub:#00674A;
+  }
+  .card, .panel, .litem { box-shadow:0 1px 4px rgba(18,32,43,.06); }
+  .badge { color:#fff; }
+  .pill.mintf { color:#fff; }
 }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { margin:0; background:var(--ink); color:var(--hi);
   font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
 body { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
 
-header { background:linear-gradient(100deg,#13372E,#152736,#231B4A);
+header { background:var(--herobg);
   padding:calc(12px + env(safe-area-inset-top)) 18px 12px;
   display:flex; align-items:center; gap:12px;
   position:sticky; top:0; z-index:5; }
@@ -41,9 +60,9 @@ header::after { content:""; position:absolute; left:0; right:30%; bottom:-2px;
   animation:sweep 3.6s linear infinite; }
 @keyframes sweep { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce){ .logo s { animation:none; } }
-h1 { font-size:17px; letter-spacing:2px; margin:0; font-weight:800; }
+h1 { font-size:17px; letter-spacing:2px; margin:0; font-weight:800; color:var(--heroon); }
 h1 small { display:block; letter-spacing:.2px; font-size:11px;
-  color:rgba(63,221,162,.65); font-weight:400; }
+  color:var(--herosub); font-weight:400; }
 
 main { padding:12px 14px; max-width:640px; margin:0 auto; }
 .note { color:var(--lo); font-size:12px; margin:8px 2px; }
@@ -64,7 +83,7 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
   min-width:64px; padding:8px 10px; border-radius:14px; font-size:11px;
   background:var(--panelhi); color:var(--lo); border:1px solid var(--line); cursor:pointer; }
 .cat span { font-size:17px; } .cat u { text-decoration:none; opacity:.55; }
-.cat.on { background:rgba(63,221,162,.16); border-color:rgba(63,221,162,.55); color:var(--mint); }
+.cat.on { background:var(--mint16); border-color:var(--mint55); color:var(--mint); }
 
 .card { display:flex; align-items:center; gap:12px; background:var(--panel);
   border-radius:18px; margin:10px 0; overflow:hidden; cursor:pointer; min-height:76px; }
@@ -107,7 +126,7 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
 .nav button { flex:1; display:flex; align-items:center; justify-content:center;
   gap:7px; border:0; background:none; color:var(--lo); font-size:13px;
   font-weight:700; padding:12px 0; border-radius:20px; cursor:pointer; }
-.nav button.on { background:rgba(63,221,162,.16); color:var(--mint); flex:1.6; }
+.nav button.on { background:var(--mint16); color:var(--mint); flex:1.6; }
 
 .addrow { display:flex; gap:8px; margin:10px 0; }
 .addrow input { flex:1; padding:12px 14px; border-radius:12px; border:1px solid var(--line);
@@ -181,9 +200,11 @@ footer b { color:var(--mint); }
    константите се генерират machinally от него, за да няма разминаване. */
 "use strict";
 
-const RULES=[["bebe", ["пелен", "бебеш", "бебе", "hipp", "bebelan", "адаптирано мляко", "залъгалк", "биберон", "aptamil", "milupa", "детска пижама", "детск"]], ["pet", ["за котки", "за кучета", "за куче", "за котка", "котешк", "кучешк", "whiskas", "pedigree", "friskies", "purina", "felix", "gourmet", "darling", "papion", "dante храна", "sunny cat", "beta pet", "mega pet", "my love храна", "k-carinura", "лакомство за"]], ["zamr", ["замразен", "заморозен", "сладолед", "джелато", "фризер"]], ["mlek", ["кисело мляко", "прясно мляко", "мляко", "сирен", "кашкавал", "извар", "яйц", "краве масло", "сметан", "айран", "айрян", "кефир", "йогурт", "моцарел", "фета", "маскарпон", "горгонзол", "гауда", "едам", "бурата", "страчатела", "пекорино", "скир", "катък", "activia", "danone"]], ["meso", ["кайма", "свинск", "пилеш", "телеш", "агнеш", "пуеш", "месо", "кебапч", "кюфте", "надени", "луканк", "салам", "шунк", "бекон", "суджук", "пастърм", "филе", "риба", "скумри", "сьомг", "пъстърв", "цац", "хек", " тон ", "миди", "скарид", " бут ", "бутче", "плешк", "врат", "ребра", "крил", "дроб", "шпек", "колбас", "карначе", "прошуто", "фует", "пиле", "ципура", "сафрид", "хайвер", "пастет", "русенско варено", "суши", "сандвич", "тарама", "taрама", "специалитет", "бирени пръчици", "спианата", "слайс"]], ["plod", ["ябълк", "банан", "портокал", "мандарин", "лимон", "грозде", "дин", "пъпеш", "круш", "праск", "кайси", "слив", "череш", "ягод", "малин", "боровинк", "киви", "ананас", "авокадо", "домат", "краставиц", "чушк", "чушлет", "пиперк", "картоф", "лук", "морков", "зеле", "тиквич", "патладж", "марул", "спанак", "броколи", "карфиол", "гъб", "магданоз", "копър", "плод", "зеленчук", "цвекло", "репичк", "целин", "джинджиф", "салата", "манго", "кокосов орех", "фурми", "смокин", "джакфрут"]], ["hlyab", ["хляб", "хлебч", "питк", "багет", "франзел", "кифл", "козунак", "тортил", "лаваш", "кора за баниц", "кори", "макарон", "спагет", "фиде", "паста ", "нудъл", "кускус", "лазан", "брашно", "мая ", "сухар", "препечен", "баниц", "баничк", "геврек", "брецел", "земел", "чабата", "гризини", "талиатели", "тортелини", "равиоли", "пица", "тесто", "поничка", "донът", "мекиц", "закуска", "фарфале", "лингуини", "паеля", "милефолие", "миниснак", "пиадин", "пекарна"]], ["napit", ["вода", "сок", "нектар", "бира", "вино", "ракия", "водка", "уиски", "джин", " ром ", "мастик", "ликьор", "шампанск", "пенливо", "кола", "фанта", "спрайт", "швепс", "енергийн", "тоник", "лимонад", "студен чай", "кафе", "нескафе", "капучино", "еспресо", "какао", "чай", "узо", "сайдер", "аперитив", "гроздова", "prosecco", "pepsi", "coca-cola", "mirinda", "7-up", "комбуча", "сироп", "джезве", "ноар", "совиньон", "мерло", "шардоне", "каберне", "сира", "напитк", "пенлив", "кафемашин", "сокоизстискв"]], ["sladko", ["шоколад", "вафл", "бисквит", "бонбон", "дъвк", "желирани", "чипс", "снакс", "крекер", "солет", "пуканк", "ядк", "фъстъ", "бадем", "кашу", "лешник", "стафид", "торта", "сладк", "мъфин", "кроасан", "десерт", "халва", "тахан", "локум", " мед", "конфитюр", "мармалад", "слънчоглед", "орех", "семки", "семе", "кекс", "целувки", "бишкот", "чийзкейк", "кантучини", "попкек", "milka", "oreo", "kit-kat", "едамаме", "соленки", "брауни", "пудинг", "еклер", "курабийк"]], ["bakal", ["ориз", "боб", "леща", "нахут", "булгур", "киноа", "грах", "захар", " сол", "оцет", "олио", "зехтин", "мазнин", "подправк", "чубриц", "черен пипер", "червен пипер", "кимион", "канела", "ванилия", "бакпулвер", "кетчуп", "майонез", "горчиц", "лютениц", "консерв", "буркан", "туршия", "маслин", "царевиц", "фасул", "супа", "бульон", " сос", "песто", "хумус", "тофу", "веган", "гулаш", "готово ястие", "чия", "кленов", "ригатони", "антипасти", "таратор"]], ["higi", ["шампоан", "балсам", "душ гел", "сапун", "паста за зъби", "четка за зъби", "вода за уста", "конец за зъби", "дезодорант", "антиперспирант", "крем", "лосион", "серум", "маска за лице", "мицелар", "тоалетно мляко", "бръснач", "бръснене", "афтършейв", "афтършейф", "тампон", "превръзк", "фон дьо тен", "спирала", "червило", "гланц", "лак за нокти", "парфюм", "тоалетна вода", "слънцезащит", "spf", "лак за коса", "боя за коса", "мокри кърпи", "мокри кърпич", "козметични кърпич", "клечки за уши", "масажно масло", "масаж", "пила за пети", "пяна за вана", "део спрей", "гел за тяло", "спрей за тяло", "флуид тяло", "спрей за след слънце", "праймер", "блендер за грим", "хайлайтър", "бронзант", "руж", "влажни кърпич", "интимен", "интимни", "резервни ножчета", "резервна глава", "за коса", "за пети", "за крака", "за скалп", "за грим", "уред за прически", "първа помощ", "nivea", "oral-b", "sensodyne", "pantene", "taft", "str8", "borotalco", "ziaja", "lactacyd", "ш-н", "с-н", " пз ", "бочко", " арома ", " aroma ", "уош енд", "колгейт", "пърл дробс", "изплакване за уста", "мицеларна"]], ["dom", ["кърпи влажни", "прах за пране", "перилен", "гел за пране", "за пране", "пранета", "омекотител", "препарат", "белин", "хлор", "почистващ", "почистване", "тоалетна хартия", "тоал. хартия", "тоал.хартия", "т.хартия", "емека", "за съдове", "салфетк", "носни кърпич", "кухненск", "фолио", "хартия за печене", "торби за смет", "торби за отпадъци", "чували", "гъб за съдове", "телен", "освежител", "ароматизатор", "инсектицид", "raid", "съдомиялна", "обезмаслител", "vanish", "domestos", "persil", "ariel", "somat", "finish", "medix", "wc ", "моп", "подочистачка", "метла", "кофа", "изтривалка", "стъклочистач", "кош за пране", "седалка за тоалетна", "четка за тоалетна", "домакински ръкавици", "попивателни", "микрофибър", "сушилник", "пожарогасител", "кош за боклук"]], ["teh", ["телевизор", "смартфон", "телефон", "пералня", "хладилник", "фурна", "печка", "климатик", "абсорбатор", "прахосмукачк", "ютия", "парогенератор", "сешоар", "машинка", "тример", "фритюрник", "скара", "мултикукър", "тостер", "миксер", "блендер", "водоструйк", "компресор", "зарядно", "батери", "usb", "разклонител", "удължител", "апарат", "уред", "трансмитер", "мултимедийна", "шевна машина", "ледогенератор", "трион", "точило", "стълба", "стелаж", "количка", "багажник", "велосипед", "стелки", "силиконов спрей", "течност за чистачки", "крушк", "лампа", "свещ", "кибрит", "тенджер", "тиган", "тава", "касерол", "гевгир", "ренде", "нож", "прибори", "чаши", "чаша", "чиния", "купа", "сервиз", "дъска", "мелничка", "черпак", "лъжица", "вилица", "шпатула", "чопър", "кутия с капак", "бретер", "термос", "дамаджана", "лепило", "табуретк", "стол", "маса", "шкаф", "етажерка", "закачалка", "легло", "матрак", "топматрак", "възглавниц", "завивка", "одеяло", "чаршаф", "калъфк", "покривало", "спален комплект", "хавлиен", "кърпа", "постелка", "халат", "пижама", "килим", "люлк", "въже", "конструктор", "играчк", "катерушка", "система за охлаждане", "вентклип", "антуриум", "бегония", "каланхое", "бромелия", "лавандула", "фикус", "сентполия", "платикодон", "котлон"]], ["dreh", ["тениск", "бермуд", "нощниц", "поло", "сутиен", "пола", "потник", "панталон", "блуза", "рокля", "чорап", "бельо", "шорти", "суитшърт", "яке", "обувк", "джапанк", "esmara"]]];
-const CATS=[["plod", "🥬", "Плодове и зеленчуци"], ["meso", "🥩", "Месо и риба"], ["mlek", "🥛", "Мляко и яйца"], ["hlyab", "🍞", "Хляб и тестени"], ["bakal", "🫙", "Бакалия"], ["napit", "🥤", "Напитки"], ["sladko", "🍫", "Сладко и солени"], ["zamr", "🧊", "Замразени"], ["higi", "🧴", "Козметика"], ["dom", "🧽", "Химия и хартия"], ["teh", "🍳", "Дом и техника"], ["dreh", "👕", "Дрехи"], ["pet", "🐾", "Домашни любимци"], ["bebe", "🍼", "Бебе"], ["drugo", "📦", "Друго"]];
+const RULES=[["bebe", ["пелен", "бебеш", "бебе", "hipp", "bebelan", "адаптирано мляко", "залъгалк", "биберон", "aptamil", "milupa", "детска пижама", "детск"]], ["pet", ["за котки", "за кучета", "за куче", "за котка", "котешк", "кучешк", "whiskas", "pedigree", "friskies", "purina", "felix", "gourmet", "darling", "papion", "dante храна", "sunny cat", "beta pet", "mega pet", "my love храна", "k-carinura", "лакомство за"]], ["zamr", ["замразен", "заморозен", "сладолед", "джелато", "фризер"]], ["mlek", ["кисело мляко", "прясно мляко", "мляко", "сирен", "кашкавал", "извар", "яйц", "краве масло", "сметан", "айран", "айрян", "кефир", "йогурт", "моцарел", "фета", "маскарпон", "горгонзол", "гауда", "едам", "бурата", "страчатела", "пекорино", "скир", "катък", "activia", "danone"]], ["meso", ["кайма", "свинск", "пилеш", "телеш", "агнеш", "пуеш", "месо", "кебапч", "кюфте", "надени", "луканк", "салам", "шунк", "бекон", "суджук", "пастърм", "филе", "риба", "скумри", "сьомг", "пъстърв", "цац", "хек", " тон ", "миди", "скарид", " бут ", "бутче", "плешк", "врат", "ребра", "крил", "дроб", "шпек", "колбас", "карначе", "прошуто", "фует", "пиле", "ципура", "сафрид", "хайвер", "пастет", "русенско варено", "суши", "сандвич", "тарама", "taрама", "специалитет", "бирени пръчици", "спианата", "слайс"]], ["plod", ["ябълк", "банан", "портокал", "мандарин", "лимон", "грозде", "дин", "пъпеш", "круш", "праск", "кайси", "слив", "череш", "ягод", "малин", "боровинк", "киви", "ананас", "авокадо", "домат", "краставиц", "чушк", "чушлет", "пиперк", "картоф", "лук", "морков", "зеле", "тиквич", "патладж", "марул", "спанак", "броколи", "карфиол", "гъб", "магданоз", "копър", "плод", "зеленчук", "цвекло", "репичк", "целин", "джинджиф", "салата", "манго", "кокосов орех", "фурми", "смокин", "джакфрут"]], ["hlyab", ["хляб", "хлебч", "питк", "багет", "франзел", "кифл", "козунак", "тортил", "лаваш", "кора за баниц", "кори", "макарон", "спагет", "фиде", "паста ", "нудъл", "кускус", "лазан", "брашно", "мая ", "сухар", "препечен", "баниц", "баничк", "геврек", "брецел", "земел", "чабата", "гризини", "талиатели", "тортелини", "равиоли", "пица", "тесто", "поничка", "донът", "мекиц", "закуска", "фарфале", "лингуини", "паеля", "милефолие", "миниснак", "пиадин", "пекарна"]], ["napit", ["вода", "сок", "нектар", "бира", "вино", "ракия", "водка", "уиски", "джин", " ром ", "мастик", "ликьор", "шампанск", "пенливо", "кола", "фанта", "спрайт", "швепс", "енергийн", "тоник", "лимонад", "студен чай", "кафе", "нескафе", "капучино", "еспресо", "какао", "чай", "узо", "сайдер", "аперитив", "гроздова", "prosecco", "pepsi", "coca-cola", "mirinda", "7-up", "комбуча", "сироп", "джезве", "ноар", "совиньон", "мерло", "шардоне", "каберне", "сира", "напитк", "пенлив", "кафемашин", "сокоизстискв"]], ["sladko", ["шоколад", "вафл", "бисквит", "бонбон", "дъвк", "желирани", "чипс", "снакс", "крекер", "солет", "пуканк", "ядк", "фъстъ", "бадем", "кашу", "лешник", "стафид", "торта", "сладк", "мъфин", "кроасан", "десерт", "халва", "тахан", "локум", " мед", "меденк", "конфитюр", "мармалад", "слънчоглед", "орех", "семки", "семе", "кекс", "целувки", "бишкот", "чийзкейк", "кантучини", "попкек", "milka", "oreo", "kit-kat", "едамаме", "соленки", "брауни", "пудинг", "еклер", "курабийк"]], ["bakal", ["ориз", "боб", "леща", "нахут", "булгур", "киноа", "грах", "захар", " сол", "оцет", "олио", "зехтин", "мазнин", "подправк", "чубриц", "черен пипер", "червен пипер", "кимион", "канела", "ванилия", "бакпулвер", "кетчуп", "майонез", "горчиц", "лютениц", "консерв", "буркан", "компот", "корнишон", "туршия", "маслин", "царевиц", "фасул", "супа", "бульон", " сос", "песто", "хумус", "тофу", "веган", "гулаш", "готово ястие", "чия", "кленов", "ригатони", "антипасти", "таратор"]], ["higi", ["шампоан", "балсам", "душ гел", "сапун", "паста за зъби", "четка за зъби", "вода за уста", "конец за зъби", "дезодорант", "антиперспирант", "крем", "лосион", "серум", "маска за лице", "мицелар", "тоалетно мляко", "бръснач", "бръснене", "афтършейв", "афтършейф", "тампон", "превръзк", "фон дьо тен", "спирала", "червило", "гланц", "лак за нокти", "парфюм", "тоалетна вода", "слънцезащит", "spf", "лак за коса", "боя за коса", "мокри кърпи", "мокри кърпич", "козметични кърпич", "клечки за уши", "масажно масло", "масаж", "пила за пети", "пяна за вана", "део спрей", "гел за тяло", "спрей за тяло", "флуид тяло", "спрей за след слънце", "праймер", "блендер за грим", "хайлайтър", "бронзант", "руж", "влажни кърпич", "влажни кърпи", "пуфис", "интимен", "интимни", "резервни ножчета", "резервна глава", "за коса", "за пети", "за крака", "за скалп", "за грим", "нурофен", "стрепсилс", "ангал", "сусп", "таблетк", "капсул", " витамин ", "витамини", " мг ", "уред за прически", "първа помощ", "nivea", "oral-b", "sensodyne", "pantene", "taft", "str8", "borotalco", "ziaja", "lactacyd", "ш-н", "с-н", " пз ", "п/з", "бочко", "ch aroma", "aroma ne", "хомеоп", "уош енд", "колгейт", "пърл дробс", "изплакване за уста", "мицеларна"]], ["dom", ["кърпи влажни", "прах за пране", "перилен", "гел за пране", "за пране", "пранета", "омекотител", "препарат", "белин", "хлор", "почистващ", "почистване", "тоалетна хартия", "тоал. хартия", "тоал.хартия", "т.хартия", "емека", "за съдове", "салфетк", "носни кърпич", "кухненск", "фолио", "хартия за печене", "торби за смет", "торби за отпадъци", "чували", "гъб за съдове", "телен", "освежител", "ароматизатор", "инсектицид", "raid", "съдомиялна", "обезмаслител", "vanish", "domestos", "persil", "ariel", "somat", "finish", "medix", "wc ", "моп", "подочистачка", "метла", "кофа", "изтривалка", "стъклочистач", "кош за пране", "седалка за тоалетна", "четка за тоалетна", "домакински ръкавици", "попивателни", "микрофибър", "сушилник", "пожарогасител", "кош за боклук"]], ["teh", ["телевизор", "смартфон", "телефон", "пералня", "хладилник", "фурна", "печка", "климатик", "абсорбатор", "прахосмукачк", "ютия", "парогенератор", "сешоар", "машинка", "тример", "фритюрник", "скара", "мултикукър", "тостер", "миксер", "блендер", "водоструйк", "компресор", "зарядно", "батери", "usb", "разклонител", "удължител", "апарат", "уред", "трансмитер", "мултимедийна", "шевна машина", "ледогенератор", "трион", "точило", "стълба", "стелаж", "количка", "багажник", "велосипед", "стелки", "силиконов спрей", "течност за чистачки", "крушк", "лампа", "свещ", "кибрит", "тенджер", "тиган", "тава", "касерол", "гевгир", "ренде", "нож", "прибори", "чаши", "чаша", "чиния", "купа", "сервиз", "дъска", "мелничка", "черпак", "лъжица", "вилица", "шпатула", "чопър", "кутия с капак", "бретер", "термос", "дамаджана", "лепило", "табуретк", "стол", "маса", "шкаф", "етажерка", "закачалка", "легло", "матрак", "топматрак", "възглавниц", "завивка", "одеяло", "чаршаф", "калъфк", "покривало", "спален комплект", "хавлиен", "кърпа", "постелка", "халат", "пижама", "килим", "люлк", "въже", "конструктор", "играчк", "катерушка", "система за охлаждане", "вентклип", "антуриум", "бегония", "каланхое", "бромелия", "лавандула", "фикус", "сентполия", "платикодон", "котлон", " филтър ", " филтри "]], ["tut", ["цигар", "сигар", "тютюн", " циг ", "корсет", "давидофф", "марлборо", "marlboro", "ротманс", "rothmans", "карелия", "karelia", "парламент", "parliament", "уинстън", "winston", "мурати", "muratti", "вайсрой", "viceroy", "dunhill", "дънхил", "merilyn", "мерилин", "честърфилд", "chesterfield", "лъки страйк", "lucky strike", " камел ", "camel legend"]], ["dreh", ["тениск", "бермуд", "нощниц", "поло", "сутиен", "пола", "потник", "панталон", "блуза", "рокля", "чорап", "бельо", "шорти", "суитшърт", "яке", "обувк", "джапанк", "esmara"]]];
+const CATS=[["plod", "🥬", "Плодове и зеленчуци"], ["meso", "🥩", "Месо и риба"], ["mlek", "🥛", "Мляко и яйца"], ["hlyab", "🍞", "Хляб и тестени"], ["bakal", "🫙", "Бакалия"], ["napit", "🥤", "Напитки"], ["sladko", "🍫", "Сладко и солени"], ["zamr", "🧊", "Замразени"], ["higi", "🧴", "Козметика"], ["dom", "🧽", "Химия и хартия"], ["teh", "🍳", "Дом и техника"], ["dreh", "👕", "Дрехи"], ["pet", "🐾", "Домашни любимци"], ["bebe", "🍼", "Бебе"], ["tut", "🚬", "Цигари"], ["drugo", "📦", "Друго"]];
 const STORE_COLORS={"кауфланд": "#E3000F", "лидл": "#0050AA", "билла": "#F3C300", "dm": "#3A6BC5", "фантастико": "#43B02A", "t-market": "#F07C00", "тмаркет": "#F07C00", "метро": "#0069B4", "lilly": "#E6007E", "cba": "#00A651", "ebag": "#EC6608", "bulmag": "#00A0DF", "кооп": "#2E8B57", "аванти": "#9B5DE5", "жанет": "#D62246", "триста": "#00B4A6", "класико": "#B07D2B"};
+const BRANDS=new Set(["agiva", "alma", "amadori", "angels", "aquafresh", "astera", "astika", "balcho", "barilla", "bauli", "bebivita", "bebo", "belino", "bella", "bianchi", "bilka", "bingo", "bionino", "blazy", "bochko", "bolgare", "bonduelle", "botanic", "bouquet", "bratanov", "bulgaricum", "cecco", "chef", "cheval", "chipicao", "colgate", "corset", "costa", "davidoff", "delle", "densify", "dent", "deroni", "devin", "domaine", "dove", "edoardo", "eduscho", "elgydium", "elmas", "elmex", "elseve", "emeka", "esse", "fairy", "familia", "fiorre", "frisolac", "frosch", "fructis", "ganchev", "garnier", "gerber", "gimoka", "gliss", "gullon", "hammer", "head", "heinz", "himalaya", "holle", "inovino", "izzi", "jacobs", "jotis", "jumbo", "kabile", "kaliakra", "karnobat", "katarzyna", "khan", "kimbo", "kinder", "krina", "krum", "lacalut", "lacmi", "lacrima", "lavazza", "lenor", "lindt", "loacker", "lotto", "lotus", "maxwhite", "meandra", "meggle", "melini", "melissa", "melitta", "melnik", "menada", "mezzek", "midalidare", "milde", "milkinis", "milva", "miroglio", "misko", "molisana", "muskat", "nano", "nescafe", "nestle", "nordics", "oberon", "oral", "ovko", "palmolive", "pampers", "panino", "papadopoulos", "parodont", "parodontax", "philicon", "plasmon", "pomorin", "quantum", "rana", "reggia", "ricco", "ricin", "roshen", "rozhen", "rubis", "sandoz", "schauma", "schogetten", "segafredo", "selpak", "sensodine", "serenata", "soli", "splat", "stallion", "statev", "stella", "stilena", "syoss", "tcherga", "tchibo", "tesori", "toblerone", "trastena", "tresemme", "trisa", "troyan", "valley", "veda", "vedrare", "venezie", "vini", "yambol", "zaara", "zebra", "zewa", "адванс", "аеро", "аквафреш", "алпинист", "анджелика", "ариана", "астера", "астика", "банкя", "баули", "бианчи", "бинго", "биопрограма", "биосет", "бисер", "боженци", "болгаре", "болярка", "бони", "ботаник", "бритос", "бюти", "веро", "ганчев", "гербер", "грил", "дева", "девин", "дейс", "дерони", "джордани", "джорджес", "добруджа", "домлян", "дрийм", "еквадор", "елмекс", "елсев", "жоси", "загорка", "загрей", "захира", "зрял", "каламон", "калиакра", "калина", "каменица", "кампезе", "карузо", "катаржина", "квантум", "керацуда", "кинг", "клио", "конс", "крина", "крум", "кръстев", "лаваца", "лакалут", "линдт", "ловико", "лото", "любекс", "магарешко", "маска", "мезек", "мелиса", "менада", "меча", "милде", "милка", "милки", "минкови", "миско", "мисота", "мити", "млин", "монарх", "мускатова", "наборъ", "нейчър", "немско", "нивеа", "оберон", "овко", "олимпус", "олинеза", "орал", "палмолив", "пантен", "парадонт", "парадонтакс", "пародонт", "пародонтакс", "пино", "поморин", "раковина", "регина", "рошен", "рубис", "ръжен", "сайкъл", "сантос", "сензодин", "сенсодин", "ситна", "слънчо", "старосел", "стражица", "тодорка", "топаз", "тотал", "траминер", "трипъл", "фамилекс", "филикон", "фиоре", "флуид", "флуорид", "фруктис", "хербал", "хидратиращ", "хималая", "цяла", "чипикао", "шато", "шаума", "шоулдърс", "якобс"]);
+const CMP_STOP_K=["българ", "продукт", "натурал", "оригинал", "премиум", "класик", "традицион", "нискомасл", "висококач", "свеж", "active", "advanced", "aktiv", "anti", "care", "classic", "clean", "clinical", "color", "colour", "complete", "daily", "dental", "double", "expert", "extra", "fresh", "gentle", "herbal", "high", "intense", "mild", "multi", "natural", "original", "perfect", "premium", "protection", "repair", "sensitive", "soft", "sport", "strong", "total", "triple", "ultimate", "white", "whitening"];
 
 
 const RAW = "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data";
@@ -267,11 +288,14 @@ const SCENT = new Set(["аромат","вкус","мирис"]);
 
 const SRC_LABEL = { 1: "официална", 2: "от магазина" };
 
-function searchIn(items, query, limit = 80) {
+const isFar = chain => S.nearOnly && S.geoKm
+  && S.geoKm[chain] != null && S.geoKm[chain] > NEAR_RADIUS;
+
+function searchIn(items, query, limit = 80, near = false) {
   const seen = new Set();
   return items
     .map(it => [it, matchScore(it.n, query)])
-    .filter(([it, sc]) => sc >= 0)
+    .filter(([it, sc]) => sc >= 0 && !(near && isFar(it.s)))
     .sort((a, b) => a[1] - b[1]
       || (a[0].u == null) - (b[0].u == null)
       || (a[0].u ?? a[0].p) - (b[0].u ?? b[0].p))
@@ -299,7 +323,7 @@ function pricesEverywhere(items, query) {
 }
 
 /* ---------- категории: огледало на Categories.of ---------- */
-const ING = new Set(["с","със","от","вкус","аромат"]);
+const ING = new Set(["с","със","от","вкус","аромат","за"]);
 function tokenize(name) {
   return name
     .replace(/(?<=[a-zа-яё])(?=[A-ZА-ЯЁ])/g, " ")
@@ -307,15 +331,25 @@ function tokenize(name) {
     .replace(/(?<=[A-Za-zА-Яа-яЁё])(?=\d)|(?<=\d)(?=[A-Za-zА-Яа-яЁё])/g, " ")
     .toLowerCase().split(/[^0-9a-zа-яё]+/).filter(Boolean);
 }
+const labKey = n => n.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 80);
+const PACK_WORDS = new Set(["буркан"]);
 function catOf(name) {
+  // AI етикетът печели пред правилата — той разбира смисъла
+  if (S.labels) {
+    const lb = S.labels[labKey(name)];
+    if (lb && lb.c) return lb.c;
+  }
   const low = name.toLowerCase();
   const words = tokenize(name);
   if (!words.length) return "drugo";
-  let bc = "", bi = 1e9, bs = -1;
-  const offer = (c, i, s) => { if (i < bi || (i === bi && s > bs)) { bc = c; bi = i; bs = s; } };
+  let bc = "", bi = 1e9, bs = -1, bst = "", nonPack = false;
+  const offer = (c, i, s, st = "") => {
+    if (!PACK_WORDS.has(st)) nonPack = true;
+    if (i < bi || (i === bi && s > bs)) { bc = c; bi = i; bs = s; bst = st; }
+  };
   for (const [cat, stems] of RULES) for (const stem of stems) {
     const t = stem.trim();
-    if (/[^a-zа-яё ]/.test(t)) { if (low.includes(t)) offer(cat, 1, t.length); continue; }
+    if (/[^a-zа-яё ]/.test(t)) { if (low.includes(t)) offer(cat, 1, t.length, t); continue; }
     const exact = stem !== t;
     const parts = t.split(" ");
     let done = false;
@@ -326,18 +360,19 @@ function catOf(name) {
         if (exact ? w !== p : !(w.startsWith(p) && (p.length >= 5 || w.length <= p.length + 3))) { ok = false; break; }
       }
       if (!ok) continue;
-      if (i === 0 || !ING.has(words[i-1])) { offer(cat, i, t.replace(/ /g, "").length); done = true; }
+      if (i === 0 || !ING.has(words[i-1])) { offer(cat, i, t.replace(/ /g, "").length, t); done = true; }
       break;
     }
-    if (!done && parts.length === 1 && parts[0].length >= 4) {
+    if (!done && !exact && parts.length === 1 && parts[0].length >= 4) {
       for (let i = 0; i < words.length; i++) {
         if (words[i].includes(parts[0]) && !/\d/.test(words[i])) {
-          if (i === 0 || !ING.has(words[i-1])) offer(cat, i, parts[0].length - 1);
+          if (i === 0 || !ING.has(words[i-1])) offer(cat, i, parts[0].length - 1, t);
           break;
         }
       }
     }
   }
+  if (bs >= 0 && PACK_WORDS.has(bst) && !nonPack) return "teh";
   return bs >= 0 ? bc : "drugo";
 }
 const catMeta = id => CATS.find(c => c[0] === id) || [id, "📦", id];
@@ -360,8 +395,18 @@ const S = {
   tab: "today", query: "",
   list: JSON.parse(localStorage.getItem("pr_list") || "[]"),
   checked: new Set(JSON.parse(localStorage.getItem("pr_checked") || "[]")),
+  watch: JSON.parse(localStorage.getItem("pr_watch") || "[]"),
+  seen: new Set(JSON.parse(localStorage.getItem("pr_seen") || "[]")),
   ranking: null, perItem: null, chosen: null,
+  cfg: null, reported: {}, repOpen: false,
 };
+const saveWatch = () => {
+  localStorage.setItem("pr_watch", JSON.stringify(S.watch));
+  localStorage.setItem("pr_seen", JSON.stringify([...S.seen].slice(-400)));
+};
+/* Ключовата дума на продукт - същата сметка като в приложението. */
+const kwOfName = n => n.split(/[\s,()]+/)
+  .filter(w => w.length >= 3 && !/\d/.test(w)).slice(0, 2).join(" ") || n.slice(0, 20);
 const saveList = () => {
   localStorage.setItem("pr_list", JSON.stringify(S.list));
   localStorage.setItem("pr_checked", JSON.stringify([...S.checked]));
@@ -375,10 +420,14 @@ const discountPct = o => {
   if (o.old && o.old > o.price && o.price > 0) return Math.round((1 - o.price / o.old) * 100);
   return null;
 };
-const unitText = o => (o.unitPrice != null && o.unitLabel) ? fmt(o.unitPrice) + " " + o.unitLabel : "";
+const unitText = o => (o.unitPrice != null && o.unitLabel) ? eur(o.unitPrice) + " " + o.unitLabel.replace("лв","€") : "";
 
 /* ---------- зареждане ---------- */
 async function boot() {
+  // офлайн: черупката и последните данни остават достъпни без обхват
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http"))
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  feed("config.json").then(c => { S.cfg = c; });
   S.idx = await feed("feed/index.json");
   render();
   if (!S.idx) return;
@@ -390,6 +439,7 @@ async function boot() {
   }
   feed("feed/search.json").then(f => { S.search = f ? f.items : []; });
   feed("feed/history.json").then(f => { S.history = f; });
+  feed("feed/labels.json").then(f => { S.labels = f ? f.l : null; });
 }
 const JUNK = /^\s*(тествай|печеливш|тест на продукт|играй|спечели|томбола|виж повече|научи повече|седмични предложени|нови продукти|всички продукти|разгледай|каталог|брошура|абонирай|информация за продукт|налично за доставка|не е налично|кошница с грижа|\d+([.,]\d+)?\s*(пране|бр|броя|г|гр|кг|мл|л|ml|g|kg|l)\b)/i;
 const isJunk = o => !o.name || o.name.trim().length < 3 || JUNK.test(o.name)
@@ -416,8 +466,8 @@ function offerCard(o) {
     </div>
     <div class="pr">
       ${pct ? `<span class="badge">−${pct}%</span>` : ""}
-      ${o.old ? `<s>${fmt(o.old)} лв</s>` : ""}
-      <b class="${pct ? "hot" : ""}">${fmt(o.price)}<em>лв</em></b>
+      ${o.old ? `<s>${eur(o.old)} €</s>` : ""}
+      <b class="${pct ? "hot" : ""}">${eur(o.price)}<em>€</em></b>
       <small>${eur(o.price)} €</small>
     </div>
   </div>`;
@@ -436,8 +486,8 @@ function hitRow(h) {
       ${ut ? `<span class="pill amber">${ut}</span>` : ""}
     </div>
     <div class="pr">
-      ${h.o ? `<s>${fmt(h.o)} лв</s>` : ""}
-      <b>${fmt(h.p)}<em>лв</em></b><small>${eur(h.p)} €</small>
+      ${h.o ? `<s>${eur(h.o)} €</s>` : ""}
+      <b>${eur(h.p)}<em>€</em></b><small>${fmt(h.p)} лв</small>
     </div>
   </div>`;
 }
@@ -450,7 +500,7 @@ function viewToday() {
 
   if (q.length >= 2) {
     if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
-    const res = searchIn(S.search, q);
+    const res = searchIn(S.search, q, 80, true);
     return head + (res.length
       ? `<div class="note">${res.length} резултата · подредени по цена за единица</div>` + res.map(hitRow).join("")
       : `<div class="empty"><b>Нищо за „${esc(q)}“</b><p>Пробвай по-обща дума — „мляко“ вместо „прясно мляко Верея 3%“.</p></div>`);
@@ -497,6 +547,28 @@ function viewToday() {
     names = rows.map(r => r.name);
   }
 
+  // --- Следените думи: попаденията чакат при всяко отваряне.
+  // Уеб версията няма известия (iOS иска пуш сървър, а ние нямаме сървър
+  // по замисъл) - затова радарът докладва тук, на видно място.
+  let watchHtml = "";
+  if (S.watch.length && S.search) {
+    const rows = [];
+    for (const kw of S.watch) {
+      const hit = searchIn(S.search, kw, 40, true)
+        .filter(h => (h.f == null || h.f === 0) && h.o && h.o > h.p)[0];
+      const key = hit ? hit.s + "|" + hit.n + "|" + hit.p : "";
+      const fresh = hit && !S.seen.has(key);
+      if (fresh) { S.seen.add(key); saveWatch(); }
+      rows.push(`<div class="rrow" style="display:flex;gap:8px;align-items:center">
+        <div style="flex:1;min-width:0">
+          <b>${esc(kw)}</b> ${hit
+            ? `${fresh ? '<span class="pill mintf">ново</span> ' : ""}- ${esc(hit.n.slice(0, 36))} · <b style="color:var(--coral)">${eur(hit.p)} €</b> в ${esc(hit.s)}`
+            : "- няма намаление в момента"}</div>
+        <button class="chip" data-unwatch="${esc(kw)}">🔕</button></div>`);
+    }
+    watchHtml = `<div class="panel"><b>🔔 Следени думи</b>${rows.join("")}</div>`;
+  }
+
   const present = {};
   for (const n of names) { const c = catOf(n); present[c] = (present[c] || 0) + 1; }
   const catsBar = `<div class="chips cats">` + CATS
@@ -518,7 +590,7 @@ function viewToday() {
   list = S.byUnit ? list.filter(o => o.unitPrice != null).sort((a, b) => a.unitPrice - b.unitPrice)
                   : list.sort((a, b) => (discountPct(b) || 0) - (discountPct(a) || 0));
   const upd = S.idx.updated ? `<div class="note">${list.length} намаления · данните са от ${esc(S.idx.updated)}</div>` : "";
-  return head + chips + catsBar + upd +
+  return head + chips + watchHtml + catsBar + upd +
     (list.length ? list.slice(0, 600).map(offerCard).join("")
       : `<div class="empty"><b>Още зареждам офертите…</b></div>`);
 }
@@ -559,7 +631,26 @@ async function toggleNear() {
 function viewList() {
   const items = S.list;
   let html = `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
-  <div class="addrow"><input id="newitem" placeholder="напр. „мляко“, „яйца“, „кайма“"><button data-act="add:">Добави</button></div>`;
+  <div class="addrow"><input id="newitem" placeholder="напр. „мляко“, „яйца“, „кайма“" value="${esc(S.nq || "")}"><button data-act="add:">Добави</button></div>`;
+
+  // Подсказки, докато пишеш — същото преживяване като търсенето в Днес:
+  // виждаш истинските цени, преди да решиш. Добавя се ключовата дума,
+  // не цялото име — то би стеснило сметката до един запис.
+  if ((S.nq || "").trim().length >= 2 && S.search) {
+    const kwOf = h => h.n.split(/[\s,()]+/).filter(w => w.length >= 3 && !/\d/.test(w))
+      .slice(0, 2).join(" ") || h.n.slice(0, 20);
+    const seen = new Set();
+    const sug = searchIn(S.search, S.nq.trim(), 40, true)
+      .filter(h => { const k = kwOf(h).toLowerCase();
+                     if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 4);
+    html += sug.map(h => {
+      const kw = kwOf(h);
+      return `<div class="crow" data-addsug="${esc(kw)}" style="cursor:pointer">
+        <div class="cn">${esc(h.n)}<br><small style="opacity:.6">ще добави „${esc(kw)}“</small></div>
+        <b>${eur(h.p)} €</b></div>`;
+    }).join("");
+  }
   if (!items.length) return html + `<div class="empty"><b>Списъкът е празен</b><p>Добави продукти и натисни „Къде е най-евтино?“.</p></div>`;
   html += `<button class="big" data-act="rank:">🧮 Къде е най-евтино?</button>`;
 
@@ -569,7 +660,7 @@ function viewList() {
       r.slice(0, 6).map(([chain, sum, cnt], i) =>
         `<div class="rrow ${chain === S.chosen ? "sel" : ""}" data-act="chain:${esc(chain)}">
           ${i === 0 ? "🥇" : (i + 1) + "."} <span style="color:${storeColor(chain)}">${esc(chain)}</span>
-          — ${fmt(sum)} лв · ${cnt}/${items.length} артикула</div>`).join("") + `</div>`;
+          — ${eur(sum)} € · ${cnt}/${items.length} артикула</div>`).join("") + `</div>`;
   }
 
   for (const it of items) {
@@ -579,17 +670,17 @@ function viewList() {
     html += `<div class="litem">
       <label><input type="checkbox" data-act="chk:${esc(it)}" ${done ? "checked" : ""}>
         <span class="${done ? "done" : ""}">${esc(it)}</span></label>
-      ${inChosen ? `<b>${fmt(inChosen.p)} лв</b>` : ""}
+      ${inChosen ? `<b>${eur(inChosen.p)} €</b>` : ""}
       <button class="x" data-act="del:${esc(it)}">✕</button>
       ${rows.slice(0, 3).map(h => `<div class="sub" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n })).replace(/'/g, "&#39;")}">
-          <span style="color:${storeColor(h.s)}">${esc(h.s)}</span> ${fmt(h.p)} лв — ${esc(h.n.slice(0, 38))}</div>`).join("")}
+          <span style="color:${storeColor(h.s)}">${esc(h.s)}</span> ${eur(h.p)} € — ${esc(h.n.slice(0, 38))}</div>`).join("")}
     </div>`;
   }
   if (S.chosen && S.perItem) {
     const total = items.reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
     const taken = items.filter(i => S.checked.has(i))
       .reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
-    html += `<div class="panel"><b>🛒 ${esc(S.chosen)}</b><div>взети ${fmt(taken)} от ${fmt(total)} лв</div></div>`;
+    html += `<div class="panel"><b>🛒 ${esc(S.chosen)}</b><div>взети ${eur(taken)} от ${eur(total)} € (${fmt(total)} лв)</div></div>`;
   }
   return html;
 }
@@ -599,7 +690,7 @@ async function rank() {
   const per = {};
   for (const it of S.list) {
     const bystore = {};
-    for (const h of searchIn(S.search, it, 400)) {
+    for (const h of searchIn(S.search, it, 400, true)) {
       if (!(h.s in bystore) || h.p < bystore[h.s].p) bystore[h.s] = h;
     }
     per[it] = Object.values(bystore).sort((a, b) => a.p - b.p);
@@ -670,6 +761,28 @@ function compareQuery(name, strict) {
       return n;
     };
     const head2 = head || cyr[0] || null;   // „Тоалетна хартия Zewa“ няма
+    // Разпозната марка = единственият партньор („същата стока“ = същата
+    // марка). Никакво падане към общи думи като „complete“.
+    const lbb = S.labels && S.labels[labKey(name)] && S.labels[labKey(name)].b
+      ? S.labels[labKey(name)].b.split(" ")[0] : null;
+    const brand = (lbb && lbb.length >= 3 && toks.includes(lbb) ? lbb : null)
+      || toks.find(w => BRANDS.has(w));
+    if (brand) {
+      const bstem = /[а-я]/.test(brand) && brand.length >= 5 ? brand.slice(0, -1) : brand;
+      const pool = [];
+      if (head2 && head2 !== brand) pool.push(head2 + " " + brand);
+      pool.push(brand);
+      let sqb = pool[0];
+      for (const q of pool) {
+        let ev = pricesEverywhere(S.search, q);
+        if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
+        ev = unitGuard(ev);
+        ev = ev.filter(r => r.n.toLowerCase().includes(bstem));
+        if (ev.length >= 2) return [ev, q];
+        sqb = q;
+      }
+      return [[], sqb];
+    }
     const partners = toks                    // категорийна дума — първата
       .filter(w => w.length >= 4 && !cmpStop(w) && w !== head2 && !ingr.has(w))
       .slice(0, 5)
@@ -714,7 +827,7 @@ function compareQuery(name, strict) {
   }
   return [best, bq];
 }
-const CMP_STOP = ["българ","продукт","натурал","оригинал","премиум","класик","традицион","нискомасл","висококач","свеж"];
+const CMP_STOP = CMP_STOP_K; // генерирано от Kotlin
 const cmpStop = w => CMP_STOP.some(s => w.startsWith(s));
 
 async function openDetail(ref) {
@@ -727,14 +840,14 @@ async function openDetail(ref) {
   const name = o ? o.name : base.n, store = o ? o.store : base.s;
   const price = o ? o.price : base.p, old = o ? o.old : base.o;
   const pct = o ? discountPct(o) : (old && old > price ? Math.round((1 - price / old) * 100) : null);
-  const ut = o ? unitText(o) : ((base.u != null && base.l) ? fmt(base.u) + " " + base.l : "");
+  const ut = o ? unitText(o) : ((base.u != null && base.l) ? eur(base.u) + " " + base.l.replace("лв","€") : "");
 
   let html = `<div class="dtop">
     ${o && o.img ? `<img src="${esc(o.img)}" alt="">` : ""}
     <div class="tag" style="color:${storeColor(store)}"><i style="background:${storeColor(store)}"></i>${esc(store.toUpperCase())}</div>
     <h2>${esc(name)}</h2>
-    <div class="dprice"><b class="${pct ? "hot" : ""}">${fmt(price)} лв</b><span>${eur(price)} €</span>
-      ${old ? `<s>${fmt(old)} лв</s>` : ""}${pct ? `<span class="badge">−${pct}%</span>` : ""}</div>
+    <div class="dprice"><b class="${pct ? "hot" : ""}">${eur(price)} €</b><span>${fmt(price)} лв</span>
+      ${old ? `<s>${eur(old)} €</s>` : ""}${pct ? `<span class="badge">−${pct}%</span>` : ""}</div>
     ${ut ? `<div class="pill amber">${ut}</div>` : ""}
   </div>`;
 
@@ -746,13 +859,13 @@ async function openDetail(ref) {
     if (ev.length >= 2) {
       const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
       html += `<h3>Цените навсякъде</h3>${modeBtns}
-      <div class="note">в ${ev.length} вериги · от ${fmt(lo)} до ${fmt(hi)} лв · ${S.cmpStrict ? "същата стока" : "подобни продукти"} по „${esc(kw)}“</div>` +
+      <div class="note">в ${ev.length} вериги · от ${eur(lo)} до ${eur(hi)} € · ${S.cmpStrict ? "същата стока" : "подобни продукти"} по „${esc(kw)}“</div>` +
         ev.slice(0, 7).map((h, i) => `<div class="crow ${i === 0 ? "best" : ""} ${h.s === store ? "cur" : ""}">
           <span class="tag" style="color:${storeColor(h.s)}"><i style="background:${storeColor(h.s)}"></i>${esc(h.s.toUpperCase())}</span>
           ${i === 0 ? '<span class="pill mintf">най-евтино</span>' : ""}
           ${h.s === store ? '<span class="mini">← гледаш това</span>' : ""}
           <div class="cn">${esc(h.n)}</div>
-          <b>${fmt(h.p)} лв</b>${(h.u != null && h.l) ? `<small>${fmt(h.u)} ${h.l}</small>` : ""}
+          <b>${eur(h.p)} €</b>${(h.u != null && h.l) ? `<small>${eur(h.u)} ${h.l.replace("лв","€")}</small>` : ""}
         </div>`).join("");
     } else {
       html += `<h3>Цените навсякъде</h3>${modeBtns}
@@ -776,9 +889,34 @@ async function openDetail(ref) {
     }
   }
 
+  const kw = kwOfName(name);
+  const watching = S.watch.includes(kw);
+  const repKey = store + "|" + name;
+  let repHtml = "";
+  if (S.cfg && S.cfg.reportUrl) {
+    if (S.reported[repKey]) {
+      repHtml = `<div class="note">✅ Докладът е приет — благодаря!</div>`;
+    } else if (S.repOpen === repKey) {
+      repHtml = `<div class="panel"><b>⚠ Какво не е наред?</b>
+        <select id="repkind" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
+          <option value="по-висока">В магазина е по-скъпо</option>
+          <option value="по-ниска">В магазина е по-евтино</option>
+          <option value="изтекла">Промоцията е изтекла</option>
+          <option value="липсва">Продуктът липсва</option>
+          <option value="друго">Друго</option></select>
+        <input id="repprice" inputmode="decimal" placeholder="реалната цена (по избор)"
+          style="width:100%;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
+        <button class="btn" style="margin-top:8px" data-repsend="${esc(repKey)}"
+          data-store="${esc(store)}" data-name="${esc(name)}" data-price="${fmt(price)}">Изпрати доклада</button></div>`;
+    } else {
+      repHtml = `<button class="btn ghost" data-repbtn="${esc(repKey)}">⚠ Цената не е вярна</button>`;
+    }
+  }
   html += `<div class="dbtns">
     ${o && o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">🔗 Виж в сайта на магазина</a>` : ""}
-    <button class="btn" data-share="${esc(name)}|${fmt(price)}|${esc(store)}${pct ? "|" + pct : ""}">📤 Сподели</button>
+    <button class="btn" data-watch="${esc(kw)}">${watching ? "🔕 Спри следенето" : "🔔 Следи „" + esc(kw) + "“"}</button>
+    ${repHtml}
+    <button class="btn" data-share="${esc(name)}|${eur(price)} €|${esc(store)}${pct ? "|" + pct : ""}">📤 Сподели</button>
     <button class="btn ghost" data-close>Затвори</button>
   </div>`;
 
@@ -807,7 +945,7 @@ function drawChart(h) {
   g.fillStyle = "#3FDDA2";
   h.p.forEach((p, i) => { g.beginPath(); g.arc(X(i), Y(p), 4, 0, 7); g.fill(); });
   g.fillStyle = "#95A4B1"; g.font = "11px system-ui";
-  g.fillText("макс " + fmt(max), 8, 9); g.fillText("мин " + fmt(min), 8, H - 3);
+  g.fillText("макс " + eur(max) + " €", 8, 9); g.fillText("мин " + eur(min) + " €", 8, H - 3);
 }
 
 /* ---------- събития ---------- */
@@ -815,17 +953,26 @@ function bind() {
   const q = $("q");
   if (q) q.oninput = () => { S.query = q.value; renderKeepFocus(); };
   const ni = $("newitem");
-  if (ni) ni.onkeydown = e => { if (e.key === "Enter") addItem(); };
+  if (ni) {
+    ni.onkeydown = e => { if (e.key === "Enter") addItem(); };
+    ni.oninput = async () => {
+      S.nq = ni.value;
+      if (S.nq.trim().length >= 2 && !S.search)
+        S.search = (await feed("feed/search.json"))?.items || null;
+      renderKeepFocus("newitem");
+    };
+  }
 }
-function renderKeepFocus() {
-  const pos = $("q")?.selectionStart;
+function renderKeepFocus(id = "q") {
+  const pos = $(id)?.selectionStart;
   render();
-  const q = $("q");
-  if (q) { q.focus(); if (pos != null) q.setSelectionRange(pos, pos); }
+  const el = $(id);
+  if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
 }
 function addItem() {
   const v = $("newitem")?.value.trim();
   if (v && !S.list.includes(v)) { S.list.push(v); S.ranking = null; saveList(); }
+  S.nq = "";
   render();
 }
 
@@ -833,7 +980,46 @@ document.addEventListener("click", e => {
   const open = e.target.closest("[data-open]");
   if (open) { openDetail(JSON.parse(open.dataset.open)); return; }
   if (e.target.closest("[data-close]") || e.target.id === "modal") {
-    $("modal").classList.remove("open"); return;
+    $("modal").classList.remove("open");
+    render();   // следените думи може да са се променили в детайла
+    return;
+  }
+  const w = e.target.closest("[data-watch]");
+  if (w) {
+    const kw = w.dataset.watch;
+    S.watch = S.watch.includes(kw) ? S.watch.filter(x => x !== kw) : [...S.watch, kw];
+    saveWatch();
+    if (S.lastRef) openDetail(S.lastRef); else render();
+    return;
+  }
+  const uw = e.target.closest("[data-unwatch]");
+  if (uw) {
+    S.watch = S.watch.filter(x => x !== uw.dataset.unwatch);
+    saveWatch(); render(); return;
+  }
+  const rb = e.target.closest("[data-repbtn]");
+  if (rb) { S.repOpen = rb.dataset.repbtn; if (S.lastRef) openDetail(S.lastRef); return; }
+  const rs = e.target.closest("[data-repsend]");
+  if (rs) {
+    const f = S.cfg.reportFields || {};
+    const body = new URLSearchParams();
+    const vals = { store: rs.dataset.store, product: rs.dataset.name,
+                   shownPrice: rs.dataset.price,
+                   realPrice: $("repprice") ? $("repprice").value : "",
+                   kind: $("repkind") ? $("repkind").value : "" };
+    for (const k in f) if (vals[k] != null) body.append(f[k], vals[k]);
+    fetch(S.cfg.reportUrl, { method: "POST", mode: "no-cors", body }).catch(() => {});
+    S.reported[rs.dataset.repsend] = 1; S.repOpen = false;
+    if (S.lastRef) openDetail(S.lastRef);
+    return;
+  }
+  const sug = e.target.closest("[data-addsug]");
+  if (sug) {
+    const kw = sug.dataset.addsug;
+    if (kw && !S.list.includes(kw)) { S.list.push(kw); S.ranking = null; saveList(); }
+    S.nq = "";
+    render();
+    return;
   }
   const cm = e.target.closest("[data-cmpmode]");
   if (cm) {
@@ -844,7 +1030,7 @@ document.addEventListener("click", e => {
   const sh = e.target.closest("[data-share]");
   if (sh) {
     const [n, p, st, pct] = sh.dataset.share.split("|");
-    const txt = `🔥 ${n}\n${p} лв${pct ? " (−" + pct + "%)" : ""} — ${st}\n\n📡 Намерено с Промо Радар`;
+    const txt = `🔥 ${n}\n${p}${pct ? " (−" + pct + "%)" : ""} — ${st}\n\n📡 Намерено с Промо Радар`;
     if (navigator.share) navigator.share({ text: txt }).catch(() => {});
     else { navigator.clipboard?.writeText(txt); sh.textContent = "✓ Копирано"; }
     return;

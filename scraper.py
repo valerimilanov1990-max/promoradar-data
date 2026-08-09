@@ -1845,6 +1845,165 @@ out center tags;
                            f"в {len(by_chain)} вериги от {len(elements)} OSM обекта")
 
 
+# ---------------------------------------------------------------------------
+# AI етикети — смисълът, който правилата не могат да уловят
+# ---------------------------------------------------------------------------
+#
+# Правилата разбират думи; „BRIO Буркан“ срещу „БОБ БУРКАН“ се различават
+# по СМИСЪЛ. Затова веднъж на пускане езиков модел преглежда САМО новите
+# имена (кешът в feed/labels.json помни всяко видяно име завинаги) и
+# връща категория, марка и тип продукт. Телефонът получава готовите
+# етикети — нула AI на устройството. Без ключ (ANTHROPIC_API_KEY в
+# GitHub Secrets) стъпката просто се прескача и правилата поемат всичко.
+
+AI_CATS = ("plod meso mlek hlyab bakal napit sladko zamr higi dom teh "
+           "dreh pet bebe tut drugo").split()
+
+def _lab_key(name):
+    return re.sub(r"\s+", " ", name).strip().lower()[:80]
+
+def _labels_prev():
+    base = CFG.get("feed_raw_base", "").rstrip("/")
+    if not base:
+        return {}
+    for br in ("data", "main"):
+        try:
+            r = requests.get(f"{base}/{br}/feed/labels.json", timeout=30)
+            if r.ok:
+                return r.json().get("l", {})
+        except Exception:
+            pass
+    return {}
+
+def _ai_batch(names, key, model):
+    """Едно повикване: до 80 имена → списък с етикети."""
+    lines = "\n".join(f"{i}|{n}" for i, n in enumerate(names))
+    prompt = (
+        "Ти си класификатор на продукти от български супермаркети. За всеки "
+        "ред (номер|име) върни JSON масив с обекти {\"i\":номер, \"c\":категория, "
+        "\"b\":марка, \"t\":тип}. Категорията е ЕДНА от: " + " ".join(AI_CATS) +
+        ". Марката е с малки букви, както е в името, или \"\" ако няма. Типът е "
+        "кратък (2-4 думи, малки букви) и описва КАКВО Е продуктът, не опаковката: "
+        "„празен буркан“ е „буркан за консервиране“ (teh), „БОБ БУРКАН“ е „боб“ "
+        "(bakal); паста за зъби с вкус ягода е higi, не плод; цигарите са tut. "
+        "Върни САМО JSON масива, без друг текст.\n\n" + lines)
+    r = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                 "content-type": "application/json"},
+        json={"model": model, "max_tokens": 4000,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=120)
+    r.raise_for_status()
+    text = r.json()["content"][0]["text"].strip()
+    m = re.search(r"\[.*\]", text, re.S)
+    out = {}
+    for row in json.loads(m.group(0) if m else text):
+        try:
+            i = int(row["i"])
+            c = row.get("c", "")
+            if c in AI_CATS and 0 <= i < len(names):
+                out[names[i]] = {"c": c,
+                                 "b": str(row.get("b", ""))[:30].lower(),
+                                 "t": str(row.get("t", ""))[:40].lower()}
+        except Exception:
+            continue
+    return out
+
+def enrich_ai():
+    import os
+    labels = _labels_prev()
+    today = datetime.date.today().isoformat()
+
+    all_names = ([o["name"] for o in OUT["offers"]] +
+                 [b["product"] for b in OUT["basics"]])
+    seen_keys = set()
+    fresh = []
+    for n in all_names:
+        k = _lab_key(n)
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        if k in labels:
+            labels[k]["l"] = today
+        else:
+            fresh.append((k, n))
+
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    model = CFG.get("ai_model", "claude-haiku-4-5")
+    max_new = int(CFG.get("ai_max_new_per_run", 4000))
+    done = 0
+    if key and fresh:
+        batch_names = [n for _, n in fresh[:max_new]]
+        key_of = {n: k for k, n in fresh[:max_new]}
+        for i in range(0, len(batch_names), 80):
+            chunk = batch_names[i:i + 80]
+            try:
+                got = _ai_batch(chunk, key, model)
+            except Exception as e:
+                note("ai", f"партида {i//80}: {type(e).__name__}: {e}")
+                break
+            for n, lab in got.items():
+                lab["l"] = today
+                labels[key_of[n]] = lab
+                done += 1
+    elif not key and fresh:
+        OUT["stats"]["ai"] = (f"{len(fresh)} нови имена чакат — няма "
+                              f"ANTHROPIC_API_KEY в secrets; правилата поемат")
+
+    # чистене: имена, невиждани от 90 дни, си отиват с офертите
+    cutoff = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
+    labels = {k: v for k, v in labels.items() if v.get("l", today) >= cutoff}
+
+    OUT["labels"] = labels
+    if key:
+        OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {done} нови "
+                              f"етикетирани сега, {max(0, len(fresh)-done)} чакат")
+
+
+# ---------------------------------------------------------------------------
+# Одит на имената — ранното предупреждение за „сапун при пъпешите“
+# ---------------------------------------------------------------------------
+#
+# Историята: „БОЧКО ПЗ ПЪПЕШ“ и „CH Aroma NE пъпеш“ се показваха като
+# подобни на истинския пъпеш, защото класификаторът в приложението не
+# познаваше марката. Този одит хваща същия модел ОЩЕ ПРИ ОБХОЖДАНЕТО:
+# име с хранителна дума + козметичен белег, но БЕЗ познатите котви
+# (Ш-Н, С-Н, ПЗ, шампоан…), отива в статистиката. Така новата марка се
+# вижда в лога на workflow-а, преди човек да я види в приложението.
+
+_AUDIT_FOOD = re.compile(
+    r"пъпеш|ябълк|ягод|праск|лимон|портокал|банан|кокос|авокадо|череш|"
+    r"боровинк|малин|киви|манго|мляко|яйц|месо|пилеш", re.I)
+_AUDIT_COSM = re.compile(
+    r"\b\d+\s*(мл|ml)\b|арома\b|aroma|парфюм", re.I)
+_AUDIT_ANCHOR = re.compile(
+    r"ш-н|с-н|\bпз\b|шампоан|сапун|балсам|душ гел|паста за зъби|крем|"
+    r"лосион|кърпи|кърпичк|дезодор|бочко|пуфис|колгейт|мицелар|"
+    r"сок|нектар|напитк|вода|кафе|чай|бира|вино|йогурт|десерт|"
+    # течни ХРАНИ в милилитри и лекарства с познати котви — не са аларма
+    r"мляко|оцет|олио|комбуча|сироп|витамин|карнитин|таблетк|капсул|"
+    r"сусп|\bмг\b|нурофен|стрепсилс|ангал|препарат|съд|fairy|frosch|"
+    r"фея|пюре|бебе|bebelan|шардоне|мерло|совиньон|ликьор|гел|спрей", re.I)
+
+def audit_names():
+    sus = []
+    for o in OUT["offers"] + [
+        {"store": b["chain"], "name": b["product"]} for b in OUT["basics"]
+    ]:
+        n = o["name"]
+        if (_AUDIT_FOOD.search(n) and _AUDIT_COSM.search(n)
+                and not _AUDIT_ANCHOR.search(n)):
+            sus.append(f'{o["store"]}: {n[:60]}')
+    if sus:
+        OUT["stats"]["одит_подозрителни"] = sus[:15]
+        OUT["stats"]["одит"] = (f"{len(sus)} имена приличат на козметика с "
+                                f"хранителна дума — провери дали не трябват "
+                                f"нови стеми в Categories.kt")
+    else:
+        OUT["stats"]["одит"] = "чисто — нито едно подозрително име"
+
+
 def write_output():
     """Пише разделен фийд + пълния файл за съвместимост.
 
@@ -1888,6 +2047,12 @@ def write_output():
         sizes["history"] = _dump("feed/history.json",
                                  {"updated": OUT["updated"],
                                   "h": OUT["history"]})
+
+    # --- AI етикетите (категория/марка/тип за всяко име) ---
+    if OUT.get("labels"):
+        sizes["labels"] = _dump("feed/labels.json",
+                                {"updated": OUT["updated"],
+                                 "l": OUT["labels"]})
 
     # --- локациите на магазините (за „вериги наблизо“) ---
     if OUT.get("geo"):
@@ -1972,6 +2137,8 @@ def main():
     scrape_reports()
     build_history()
     build_geo()
+    enrich_ai()
+    audit_names()
 
     OUT["stats"]["време общо"] = f"{elapsed_min():.1f} мин"
     OUT["stats"]["offers_total"] = len(OUT["offers"])
