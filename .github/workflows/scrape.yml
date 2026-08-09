@@ -2,7 +2,8 @@ name: Scrape
 
 on:
   schedule:
-    - cron: "0 4 * * *"    # всяка сутрин 04:00 UTC (7:00 БГ)
+    - cron: "0 4 * * *"    # 07:00 БГ — прясната сутрешна брошура
+    - cron: "0 11 * * *"   # 14:00 БГ — втора точка за историята на цените
   workflow_dispatch: {}      # + ръчно пускане от бутона Run workflow
 
 permissions:
@@ -31,6 +32,10 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Run scraper
+        env:
+          # AI етикетите: ключът живее САМО в GitHub Secrets. Без него
+          # стъпката се прескача и правилата поемат всичко.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python scraper.py
 
       # ------------------------------------------------------------------
