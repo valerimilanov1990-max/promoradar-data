@@ -1881,17 +1881,24 @@ def _ai_batch(names, key, model):
     prompt = (
         "Ти си класификатор на продукти от български супермаркети. За всеки "
         "ред (номер|име) върни JSON масив с обекти {\"i\":номер, \"c\":категория, "
-        "\"b\":марка, \"t\":тип}. Категорията е ЕДНА от: " + " ".join(AI_CATS) +
+        "\"b\":марка, \"t\":тип, \"p\":каноничен продукт, \"q\":количество}. "
+        "Категорията е ЕДНА от: " + " ".join(AI_CATS) +
         ". Марката е с малки букви, както е в името, или \"\" ако няма. Типът е "
         "кратък (2-4 думи, малки букви) и описва КАКВО Е продуктът, не опаковката: "
         "„празен буркан“ е „буркан за консервиране“ (teh), „БОБ БУРКАН“ е „боб“ "
         "(bakal); паста за зъби с вкус ягода е higi, не плод; цигарите са tut. "
+        "Каноничният продукт (p) е ЕДНАКЪВ за всички изписвания на един и същ "
+        "продукт: марка + тип + вариант + количество, малки букви, точно в този "
+        "ред — „ПРЯСНО МЛЯКО ВЕРЕЯ 3% 1Л“ и „Верея прясно мляко 3.0% 1 l“ дават "
+        "еднакво \"верея прясно мляко 3% 1л\"; без марка се пропуска марката. "
+        "Количеството (q) е ОБЩОТО в опаковката, само число и единица от г|мл|бр "
+        "— „3x100г“ дава \"300 г\", „1,5 л“ дава \"1500 мл\", неизвестно = \"\". "
         "Върни САМО JSON масива, без друг текст.\n\n" + lines)
     r = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                  "content-type": "application/json"},
-        json={"model": model, "max_tokens": 4000,
+        json={"model": model, "max_tokens": 6000,
               "messages": [{"role": "user", "content": prompt}]},
         timeout=120)
     r.raise_for_status()
@@ -1905,7 +1912,9 @@ def _ai_batch(names, key, model):
             if c in AI_CATS and 0 <= i < len(names):
                 out[names[i]] = {"c": c,
                                  "b": str(row.get("b", ""))[:30].lower(),
-                                 "t": str(row.get("t", ""))[:40].lower()}
+                                 "t": str(row.get("t", ""))[:40].lower(),
+                                 "p": str(row.get("p", ""))[:70].lower(),
+                                 "q": str(row.get("q", ""))[:15].lower()}
         except Exception:
             continue
     return out
@@ -1953,14 +1962,90 @@ def enrich_ai():
         OUT["stats"]["ai"] = (f"{len(fresh)} нови имена чакат — няма "
                               f"ANTHROPIC_API_KEY в secrets; правилата поемат")
 
+    # Досъбиране: старите етикети нямат каноничен продукт (p) — минават
+    # повторно, в рамките на същия бюджет, докато всички го получат.
+    backfilled = 0
+    if key:
+        room = max_new - done
+        redo = [k for k, v in labels.items()
+                if "p" not in v and v.get("l") == today][:room]
+        for i in range(0, len(redo), 80):
+            chunk = redo[i:i + 80]
+            try:
+                got = _ai_batch(chunk, key, model)
+            except Exception as e:
+                note("ai", f"досъбиране {i//80}: {type(e).__name__}: {e}")
+                continue
+            for n, lab in got.items():
+                lab["l"] = labels.get(n, {}).get("l", today)
+                labels[n] = lab
+                backfilled += 1
+
     # чистене: имена, невиждани от 90 дни, си отиват с офертите
     cutoff = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
     labels = {k: v for k, v in labels.items() if v.get("l", today) >= cutoff}
 
     OUT["labels"] = labels
     if key:
-        OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {done} нови "
-                              f"етикетирани сега, {max(0, len(fresh)-done)} чакат")
+        no_p = sum(1 for v in labels.values() if "p" not in v)
+        OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {done} нови, "
+                              f"{backfilled} досъбрани канонични, "
+                              f"{max(0, len(fresh)-done)} чакат нови, "
+                              f"{no_p} чакат канонично име")
+
+
+# ---------------------------------------------------------------------------
+# Количествата от AI → цена за единица там, където правилата не стигат
+# ---------------------------------------------------------------------------
+#
+# Regex-ът хваща „500 г“, но не и „3x100г“ или „кашон 12 бр“. AI етикетът
+# носи ОБЩОТО количество (q) — тук то се превръща в цена за единица за
+# редовете, които още нямат. Така подредбата „за единица“ и сравнението
+# на опаковки покриват почти всичко.
+
+_AI_Q_RE = re.compile(r"^(\d+(?:[.,]\d+)?)\s*(г|мл|бр)$")
+
+def _unit_from_q(price, q):
+    m = _AI_Q_RE.match(q.strip())
+    if not m or price <= 0:
+        return None
+    v = float(m.group(1).replace(",", "."))
+    if v <= 0:
+        return None
+    unit = m.group(2)
+    if unit == "г":
+        return round(price / (v / 1000.0), 2), "лв/кг"
+    if unit == "мл":
+        return round(price / (v / 1000.0), 2), "лв/л"
+    return round(price / v, 2), "лв/бр"
+
+def apply_ai_quantities():
+    labels = OUT.get("labels") or {}
+    if not labels:
+        return
+    filled = 0
+    for o in OUT["offers"]:
+        if o.get("unitPrice") is not None:
+            continue
+        lab = labels.get(_lab_key(o["name"]))
+        if not lab or not lab.get("q"):
+            continue
+        got = _unit_from_q(float(o["price"]), lab["q"])
+        if got:
+            o["unitPrice"], o["unitLabel"] = got
+            filled += 1
+    for b in OUT["basics"]:
+        if b.get("unitPrice") is not None:
+            continue
+        lab = labels.get(_lab_key(b["product"]))
+        if not lab or not lab.get("q"):
+            continue
+        got = _unit_from_q(float(b["price"]), lab["q"])
+        if got:
+            b["unitPrice"], b["unitLabel"] = got
+            filled += 1
+    if filled:
+        OUT["stats"]["ai_количества"] = f"{filled} реда получиха цена за единица от AI"
 
 
 # ---------------------------------------------------------------------------
@@ -2002,8 +2087,88 @@ def audit_names():
         OUT["stats"]["одит"] = (f"{len(sus)} имена приличат на козметика с "
                                 f"хранителна дума — провери дали не трябват "
                                 f"нови стеми в Categories.kt")
+        _audit_ai(sus[:15])
     else:
         OUT["stats"]["одит"] = "чисто — нито едно подозрително име"
+
+
+def _audit_ai(sus):
+    """Автопилотът: AI преглежда подозрителните и предлага готовите стеми.
+
+    Предложенията отиват само в статистиката — човек ги одобрява, преди
+    да влязат в речника. Едно повикване на пускане, стотинка."""
+    import os
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not key:
+        return
+    model = CFG.get("ai_model", "claude-haiku-4-5")
+    lines = "\n".join(s.split(": ", 1)[-1] for s in sus)
+    prompt = (
+        "Това са продукти от български магазини, които класификатор по думи "
+        "може да сбърка (хранителна дума в нехранителен продукт или обратно). "
+        "За всеки ред върни JSON масив с {\"n\":първите 30 знака от името, "
+        "\"c\":правилната категория от " + " ".join(AI_CATS) + ", "
+        "\"s\":думата-котва от името, която еднозначно издава категорията "
+        "(марка, съкращение или тип, с малки букви)}. Само JSON.\n\n" + lines)
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": model, "max_tokens": 1500,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=90)
+        r.raise_for_status()
+        text = r.json()["content"][0]["text"].strip()
+        m = re.search(r"\[.*\]", text, re.S)
+        rows = json.loads(m.group(0) if m else text)
+        OUT["stats"]["одит_ai_предложения"] = [
+            f'{str(x.get("n",""))[:30]} → {x.get("c","")} (стем: „{x.get("s","")}“)'
+            for x in rows if x.get("c") in AI_CATS][:15]
+    except Exception as e:
+        note("одит-ai", f"{type(e).__name__}: {e}")
+
+
+def build_digest():
+    """Дневният дайджест: 2-3 човешки изречения за най-добрите сделки.
+
+    Отива във feed/digest.json — приложението и уеб версията го показват
+    като бележка на деня. Едно повикване на пускане."""
+    import os
+    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not key or not OUT["offers"]:
+        return
+    model = CFG.get("ai_model", "claude-haiku-4-5")
+    top = sorted(
+        OUT["offers"],
+        key=lambda o: -(o.get("pct") or (
+            int((1 - o["price"] / o["old"]) * 100) if o.get("old") else 0))
+    )[:8]
+    lines = "\n".join(
+        f'{o["store"]}: {o["name"][:55]} — {o["price"]:.2f} лв'
+        + (f' (беше {o["old"]:.2f})' if o.get("old") else "")
+        for o in top)
+    prompt = (
+        "Ти пишеш дневната бележка на приложение за промоции. От тези "
+        "най-големи намаления днес напиши 2-3 кратки изречения на български "
+        "— кое си струва и защо, делово и без възклицания, без емоджита, "
+        "цените в евро (лв ÷ 1.95583, закръглени до стотинка). "
+        "Върни САМО текста.\n\n" + lines)
+    try:
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": model, "max_tokens": 400,
+                  "messages": [{"role": "user", "content": prompt}]},
+            timeout=90)
+        r.raise_for_status()
+        text = r.json()["content"][0]["text"].strip()[:500]
+        if text:
+            OUT["digest"] = text
+            OUT["stats"]["дайджест"] = text[:80] + "…"
+    except Exception as e:
+        note("дайджест", f"{type(e).__name__}: {e}")
 
 
 def write_output():
@@ -2049,6 +2214,12 @@ def write_output():
         sizes["history"] = _dump("feed/history.json",
                                  {"updated": OUT["updated"],
                                   "h": OUT["history"]})
+
+    # --- дневният дайджест (бележката на деня) ---
+    if OUT.get("digest"):
+        sizes["digest"] = _dump("feed/digest.json",
+                                {"updated": OUT["updated"],
+                                 "text": OUT["digest"]})
 
     # --- AI етикетите (категория/марка/тип за всяко име) ---
     if OUT.get("labels"):
@@ -2140,7 +2311,9 @@ def main():
     build_history()
     build_geo()
     enrich_ai()
+    apply_ai_quantities()
     audit_names()
+    build_digest()
 
     OUT["stats"]["време общо"] = f"{elapsed_min():.1f} мин"
     OUT["stats"]["offers_total"] = len(OUT["offers"])
