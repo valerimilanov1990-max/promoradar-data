@@ -1980,6 +1980,13 @@ def enrich_ai():
                 lab["l"] = labels.get(n, {}).get("l", today)
                 labels[n] = lab
                 backfilled += 1
+            # AI-ят прегледа целия пакет: имената, за които не върна
+            # канонично име (карти, отстъпки, общи текстове), получават
+            # празно "p" — прегледано е, няма какво да се измисли, и не
+            # се пращат отново при всяко пускане.
+            for n in chunk:
+                if n in labels and "p" not in labels[n]:
+                    labels[n]["p"] = ""
 
     # чистене: имена, невиждани от 90 дни, си отиват с офертите
     cutoff = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
