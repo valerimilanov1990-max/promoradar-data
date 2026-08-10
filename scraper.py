@@ -1941,8 +1941,10 @@ def enrich_ai():
             try:
                 got = _ai_batch(chunk, key, model)
             except Exception as e:
+                # една счупена партида не бива да спира останалите —
+                # неетикетираните ще дойдат пак при следващото пускане
                 note("ai", f"партида {i//80}: {type(e).__name__}: {e}")
-                break
+                continue
             for n, lab in got.items():
                 lab["l"] = today
                 labels[key_of[n]] = lab
