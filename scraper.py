@@ -1994,7 +1994,11 @@ def enrich_ai():
 
     OUT["labels"] = labels
     if key:
-        no_p = sum(1 for v in labels.values() if "p" not in v)
+        # броим само реално чакащите: имена от днешните оферти без "p".
+        # Старите без "p", които вече не се появяват, не се пращат никъде
+        # и не струват нищо — не влизат в брояча.
+        no_p = sum(1 for v in labels.values()
+                   if "p" not in v and v.get("l") == today)
         OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {done} нови, "
                               f"{backfilled} досъбрани канонични, "
                               f"{max(0, len(fresh)-done)} чакат нови, "
