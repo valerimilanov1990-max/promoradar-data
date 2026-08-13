@@ -279,6 +279,58 @@ JUNK_IMG_RE = re.compile(
     r"/logo|placeholder|sprite|favicon|\.svg(\?|$)", re.IGNORECASE)
 
 
+# Слепени имена: „TuborgБира0,5 л кен-30% отстъпка с“.
+# Причината е в HTML-а на веригата (съседни <span>-ове без разделител),
+# но поправката трябва да е и тук — JS-ът в браузъра не хваща всичко,
+# а имената влизат право във фийда и после в приложението.
+# По ДВА знака от всяка страна на границата. С един знак се чупят
+# хомоглифите: във фийда има имена с латинско „E“ или „o“ вътре в
+# кирилска дума („Raid Eлектрически кoмплект“, „Сьомгoва пъстърва“,
+# „Lavazza Qualita Оrо“) и наивното правило ги накъсва на срички.
+# Същите правила са и в app/.../NameClean.kt — дръж ги еднакви.
+_GLUE_CASE = re.compile(r"([a-zа-яё])([A-ZА-ЯЁ][a-zа-яё])")
+_GLUE_LAT_CYR = re.compile(r"([A-Za-z]{2})([А-Яа-яЁё]{2})")
+_GLUE_CYR_LAT = re.compile(r"([А-Яа-яЁё]{2})([A-Za-z]{2})")
+_GLUE_ALPHA_NUM = re.compile(r"([A-Za-zА-Яа-яЁё]{2})(\d)")
+_GLUE_NUM_ALPHA = re.compile(r"(\d)([A-Za-zА-Яа-яЁё]{2})")
+
+# Опашки, които не са част от името на стоката.
+_TAIL_RE = re.compile(
+    r"\s*[-–—]?\s*\d{1,2}\s*%?\s*отстъпка(\s+с)?\s*$"
+    r"|\s*цена\s+с(\s+карта)?\s*$"
+    r"|\s*[-–—]\s*\d{1,2}\s*%\s*$",
+    re.IGNORECASE)
+
+
+def clean_name(name):
+    """Разлепя слепените думи и маха рекламните опашки."""
+    s = re.sub(r"\s+", " ", name or "").strip()
+    if not s:
+        return s
+    for _ in range(3):
+        before = s
+        s = _GLUE_CASE.sub(r"\1 \2", s)
+        s = _GLUE_LAT_CYR.sub(r"\1 \2", s)
+        s = _GLUE_CYR_LAT.sub(r"\1 \2", s)
+        s = _GLUE_ALPHA_NUM.sub(r"\1 \2", s)
+        s = _GLUE_NUM_ALPHA.sub(r"\1 \2", s)
+        if s == before:
+            break
+    for _ in range(3):
+        n = _TAIL_RE.sub("", s).strip()
+        if n == s:
+            break
+        s = n
+    return re.sub(r"\s+", " ", s).strip(" -–—·,")
+
+
+def looks_glued(name):
+    """Диагностика: остана ли слепване след почистването."""
+    s = name or ""
+    return bool(_GLUE_CASE.search(s) or _GLUE_LAT_CYR.search(s)
+                or _GLUE_CYR_LAT.search(s) or _GLUE_ALPHA_NUM.search(s))
+
+
 def is_junk_offer(o):
     """True = това не е стока и не бива да влиза във фийда."""
     name = (o.get("name") or "").strip()
@@ -302,6 +354,11 @@ def clean_offer(o):
     """Маха подвеждащите полета, без да изхвърля целия запис."""
     if JUNK_IMG_RE.search(o.get("img") or ""):
         o["img"] = ""
+    # Последна защита: каквото и да е дошло от кой да е източник,
+    # името се разлепя тук, преди да влезе във фийда.
+    n = clean_name(o.get("name") or "")
+    if n:
+        o["name"] = n[:90]
     old, price = o.get("old"), o.get("price")
     # Стара цена, която е под или равна на новата, не е стара цена.
     if old is not None and price and old <= price * 1.005:
@@ -474,22 +531,75 @@ JS_HELPERS = r"""
     return letters < 5 || digits >= letters;
   };
 
+  // Текстът на елемент СЪС разделители между съседните възли.
+  //
+  // Защо не textContent: Кауфланд строи името от няколко <span>-а
+  //   <span>Омар</span><span>от нашата витрина</span><span>кг</span>
+  // и textContent ги слепва в „Омарот нашата витринакг“. innerText би
+  // помогнал, но пада при display:none и е бавен. Затова обхождаме
+  // текстовите възли и слагаме интервал между тях.
+  const textOf = (el) => {
+    if (!el) return '';
+    let s = '';
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let n;
+    while ((n = walk.nextNode())) {
+      const t = (n.nodeValue || '').trim();
+      if (t) s += (s ? ' ' : '') + t;
+    }
+    return s.replace(/\s+/g, ' ').trim();
+  };
+
+  // Останало слепване (различна азбука, буква→цифра, малка→главна).
+  // „TuborgБира0,5“ → „Tuborg Бира 0,5“.
+  // По ДВА знака от всяка страна: с един се чупят хомоглифите
+  // („Raid Eлектрически“ → „Raid E лектрически“). Същото правило е в
+  // clean_name по-долу и в NameClean.kt в приложението.
+  const unglue = (s) => {
+    let t = s;
+    for (let i = 0; i < 3; i++) {
+      const before = t;
+      t = t
+        .replace(/([a-zа-яё])([A-ZА-ЯЁ][a-zа-яё])/g, '$1 $2')
+        .replace(/([A-Za-z]{2})([А-Яа-яЁё]{2})/g, '$1 $2')
+        .replace(/([А-Яа-яЁё]{2})([A-Za-z]{2})/g, '$1 $2')
+        .replace(/([A-Za-zА-Яа-яЁё]{2})(\d)/g, '$1 $2')
+        .replace(/(\d)([A-Za-zА-Яа-яЁё]{2})/g, '$1 $2');
+      if (t === before) break;
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  };
+
+  // Опашки, които не са част от името: „-20% отстъпка с“, „Цена с карта“.
+  const TAIL = /\s*[-–—]?\s*\d{1,2}\s*%?\s*отстъпка(\s+с)?\s*$|\s*цена\s+с\s*$|\s*[-–—]\s*\d{1,2}\s*%\s*$/i;
+  const stripTail = (s) => {
+    let t = s;
+    for (let i = 0; i < 3; i++) {
+      const n = t.replace(TAIL, '').trim();
+      if (n === t) break;
+      t = n;
+    }
+    return t;
+  };
+
   const nameOf = (el) => {
     // Събираме ВСИЧКИ кандидати и взимаме най-информативния.
     // Ако вземем първия заглавен елемент, за Кауфланд излиза само
     // марката („Martini“) вместо цялото име на продукта.
     const cands = [];
     el.querySelectorAll('[class*="title" i],[class*="name" i],[class*="titel" i],h2,h3,h4,h5')
-      .forEach(t => cands.push((t.textContent || '').replace(/\s+/g, ' ').trim()));
+      .forEach(t => cands.push(textOf(t)));
     const img = el.querySelector('img');
     if (img && img.alt) {
       cands.push(img.alt.replace(ALT_PREFIX, '').replace(/\s+/g, ' ').trim());
     }
-    (el.innerText || el.textContent || '').split('\n')
+    (el.innerText || '').split('\n')
       .forEach(s => cands.push(s.replace(/\s+/g, ' ').trim()));
+    cands.push(textOf(el));
 
     let best = '';
-    for (const s of cands) {
+    for (const raw of cands) {
+      const s = stripTail(unglue(raw || ''));
       if (!s || s.length < 3 || s.length > 140) continue;
       if (/^[\d.,\s%€лвkg\-–—]+$/i.test(s)) continue;   // само числа
       if (isUnitLine(s)) continue;
@@ -931,7 +1041,7 @@ def _harvest(ctx, store, url, keywords=()):
             prices = [x for x in prices if 0.1 <= x <= 5000]
             if not prices:
                 continue
-            name = re.sub(r"\s+", " ", it.get("name") or "").strip()
+            name = clean_name(it.get("name") or "")
             if sum(c.isalpha() for c in name) < 5:
                 continue
             price, old = pick_price_pair(prices, it.get("pct"))
@@ -1881,7 +1991,24 @@ def _ai_batch(names, key, model):
     prompt = (
         "Ти си класификатор на продукти от български супермаркети. За всеки "
         "ред (номер|име) върни JSON масив с обекти {\"i\":номер, \"c\":категория, "
-        "\"b\":марка, \"t\":тип, \"p\":каноничен продукт, \"q\":количество}. "
+        "\"b\":марка, \"t\":тип, \"p\":каноничен продукт, \"q\":количество, "
+        "\"a\":алкохол}. "
+        # Имената идват от HTML на веригите и често са счупени: думите са
+        # слепени и към тях е залепен рекламен текст. Моделът вижда цялото
+        # име и се справя, стига да знае какво да очаква.
+        "ВАЖНО: имената често са счупени — слепени думи без интервал и "
+        "залепен рекламен текст: „Омарот нашата витринакг-20% отстъпка с“ е "
+        "омар, „TuborgБира0,5 л кен“ е бира Tuborg. Игнорирай „от нашата/"
+        "свежата витрина“, „от нашата пекарна“, „-N% отстъпка“, „цена с "
+        "карта“ — това не е част от продукта. "
+        # Без това във фийда влизат етикети за „спести 16%“ и „отстъпка“.
+        "Ако редът НЕ Е стока (напр. „спести 16%“, „отстъпка с карта“, "
+        "„цена“), върни c=\"drugo\", t=\"\", p=\"\". "
+        # Категориите нямат раздел за алкохол — ракия и лимонада попадат в
+        # една кофа (napit) и приложението ги смесва при сравнение.
+        "Полето a е 1, ако продуктът съдържа алкохол (бира, вино, ракия, "
+        "уиски, водка, ликьор, аперитив, пенливо, напитка на винена основа), "
+        "иначе 0. Безалкохолна бира и вино 0,0% са a=0. "
         "Категорията е ЕДНА от: " + " ".join(AI_CATS) +
         ". Марката е с малки букви, както е в името, или \"\" ако няма. Типът е "
         "кратък (2-4 думи, малки букви) и описва КАКВО Е продуктът, не опаковката: "
@@ -1914,10 +2041,17 @@ def _ai_batch(names, key, model):
                                  "b": str(row.get("b", ""))[:30].lower(),
                                  "t": str(row.get("t", ""))[:40].lower(),
                                  "p": str(row.get("p", ""))[:70].lower(),
-                                 "q": str(row.get("q", ""))[:15].lower()}
+                                 "q": str(row.get("q", ""))[:15].lower(),
+                                 "a": 1 if str(row.get("a", 0)) in ("1", "True", "true") else 0}
         except Exception:
             continue
     return out
+
+# Версия на промпта. Вдигни я, когато промениш _ai_batch — старите етикети
+# се преетикетират постепенно (по ai_max_new_per_run на пускане), вместо да
+# висят завинаги в стария формат. v2 добави полето „a“ (алкохол).
+AI_PROMPT_VER = 2
+
 
 def enrich_ai():
     import os
@@ -1928,6 +2062,7 @@ def enrich_ai():
                  [b["product"] for b in OUT["basics"]])
     seen_keys = set()
     fresh = []
+    stale = []
     for n in all_names:
         k = _lab_key(n)
         if k in seen_keys:
@@ -1935,6 +2070,10 @@ def enrich_ai():
         seen_keys.add(k)
         if k in labels:
             labels[k]["l"] = today
+            # Етикет от стар промпт: преетикетира се, но с нисък приоритет —
+            # новите имена винаги минават първи.
+            if labels[k].get("v", 1) < AI_PROMPT_VER:
+                stale.append((k, n))
         else:
             fresh.append((k, n))
 
@@ -1942,6 +2081,7 @@ def enrich_ai():
     model = CFG.get("ai_model", "claude-haiku-4-5")
     max_new = int(CFG.get("ai_max_new_per_run", 4000))
     done = 0
+    relabeled = 0
     if key and fresh:
         batch_names = [n for _, n in fresh[:max_new]]
         key_of = {n: k for k, n in fresh[:max_new]}
@@ -1956,9 +2096,32 @@ def enrich_ai():
                 continue
             for n, lab in got.items():
                 lab["l"] = today
+                lab["v"] = AI_PROMPT_VER
                 labels[key_of[n]] = lab
                 done += 1
-    elif not key and fresh:
+
+    # Преетикетиране по новия промпт. НЕ е вложено в `if fresh` — при
+    # пускане без нови имена миграцията пак трябва да върви.
+    # Половин бюджет, за да остане място за досъбирането на канонични имена.
+    if key and stale:
+        room = min(max_new - done, max(1, max_new // 2))
+        if room > 0:
+            redo_names = [n for _, n in stale[:room]]
+            redo_key = {n: k for k, n in stale[:room]}
+            for i in range(0, len(redo_names), 80):
+                chunk = redo_names[i:i + 80]
+                try:
+                    got = _ai_batch(chunk, key, model)
+                except Exception as e:
+                    note("ai", f"преетикетиране {i//80}: {type(e).__name__}: {e}")
+                    continue
+                for n, lab in got.items():
+                    lab["l"] = today
+                    lab["v"] = AI_PROMPT_VER
+                    labels[redo_key[n]] = lab
+                    done += 1
+                    relabeled += 1
+    if not key and fresh:
         OUT["stats"]["ai"] = (f"{len(fresh)} нови имена чакат — няма "
                               f"ANTHROPIC_API_KEY в secrets; правилата поемат")
 
@@ -1978,6 +2141,9 @@ def enrich_ai():
                 continue
             for n, lab in got.items():
                 lab["l"] = labels.get(n, {}).get("l", today)
+                # Направен е с текущия промпт — иначе остава „stale“
+                # завинаги и яде бюджет при всяко пускане.
+                lab["v"] = AI_PROMPT_VER
                 labels[n] = lab
                 backfilled += 1
             # AI-ят прегледа целия пакет: имената, за които не върна
@@ -1999,9 +2165,13 @@ def enrich_ai():
         # и не струват нищо — не влизат в брояча.
         no_p = sum(1 for v in labels.values()
                    if "p" not in v and v.get("l") == today)
-        OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {done} нови, "
+        new_done = done - relabeled
+        stale_left = max(0, len(stale) - relabeled)
+        OUT["stats"]["ai"] = (f"{len(labels)} етикета в кеша, {new_done} нови, "
+                              f"{relabeled} преетикетирани (промпт v{AI_PROMPT_VER}), "
                               f"{backfilled} досъбрани канонични, "
-                              f"{max(0, len(fresh)-done)} чакат нови, "
+                              f"{max(0, len(fresh)-new_done)} чакат нови, "
+                              f"{stale_left} чакат преетикетиране, "
                               f"{no_p} чакат канонично име")
 
 
