@@ -230,5 +230,7 @@
     "клон, днешните цени се добавят (точка само при промяна) и файлът се",
     "записва обратно. Продукти, невиждани от 60 дни, изпадат."
   ],
-  "feed_raw_base": "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data"
+  "feed_raw_base": "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data",
+  "ai_max_new_per_run": 10000,
+  "ai_deadline_min": 70
 }

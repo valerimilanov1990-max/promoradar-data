@@ -302,6 +302,59 @@ _TAIL_RE = re.compile(
     re.IGNORECASE)
 
 
+# --- Правила, пренесени от app/.../NameClean.kt (12.08.2026) ---
+# Приложението ги имаше, скрейпърът — не. Заради това във фийда останаха
+# 34 записа от Кауфланд от рода на „Мерлуза филеот нашата витринакг“:
+# телефонът ги оправяше при показване, но самият фийд, уеб версията и
+# КЛЮЧОВЕТЕ на AI етикетите оставаха мръсни.
+
+# Слепен предлог пред известна следваща дума: „филеот нашата“ → „филе от нашата“.
+_GLUED_PREP = re.compile(
+    r"([А-Яа-яЁё]{3,})от\s+(нашата|нашето|свежата|нашия|нашите|витрината)",
+    re.IGNORECASE)
+
+# Рекламни фрази — МАХАТ СЕ, не просто се разделят. „от нашата витрина“
+# описва къде стои стоката, не каква е.
+# Внимание: „Нашата Трапеза“ е марка колбаси, затова се маха само цялата
+# фраза С предлога, никога само думата „нашата“.
+_MARKETING = [
+    re.compile(r"\s*от\s+(нашата|нашето|свежата|нашия|нашите)\s+\S+", re.IGNORECASE),
+    re.compile(r"\s*от\s+витрината", re.IGNORECASE),
+    re.compile(r"\s*от\s+(нашата\s+)?(пекарна|скара|кухня|месарница)", re.IGNORECASE),
+]
+
+# Залепена наставка, която regex не може да раздели (няма граница между
+# малки букви): „витринакг“ → „витрина кг“.
+_GLUED_SUFFIX = [
+    "от нашата витрина", "от свежата витрина", "от витрината",
+    "от нашата пекарна", "от нашето месарство",
+    "отстъпка с", "отстъпка", "цена с карта", "цена с",
+    "кг", "гр", "мл", "бр", "литра", "литър", "опаковка", "пакет",
+    "различни видове", "различни сортове", "различни",
+]
+
+# Гола единица накрая без число пред нея: „Омар кг“ → „Омар“.
+# „Мляко 1 л“ остава — там числото носи смисъл.
+_TRAILING_UNIT = re.compile(r"(?<![\d,.])\s+(кг|гр|гр\.|г|мл|л|бр|бр\.)\s*$",
+                            re.IGNORECASE)
+
+
+def _split_glued_word(w):
+    """Отделя залепена наставка от една дума. „витринакг“ → „витрина кг“."""
+    if len(w) < 5:
+        return w
+    lo = w.lower()
+    for suf in _GLUED_SUFFIX:
+        t = suf.replace(" ", "")
+        if len(lo) > len(t) + 3 and lo.endswith(t):
+            head = w[:len(w) - len(t)]
+            # само ако отпред остава истинска дума — иначе „багаж“ би
+            # станало „бага ж“
+            if len(head) >= 4 and any(c.isalpha() for c in head):
+                return head + " " + suf
+    return w
+
+
 def clean_name(name):
     """Разлепя слепените думи и маха рекламните опашки."""
     s = re.sub(r"\s+", " ", name or "").strip()
@@ -321,7 +374,21 @@ def clean_name(name):
         if n == s:
             break
         s = n
-    return re.sub(r"\s+", " ", s).strip(" -–—·,")
+
+    # Речник по дума: „витринакг“ → „витрина кг“
+    s = " ".join(_split_glued_word(w) for w in s.split(" "))
+    # Слепен предлог, после махане на рекламната фраза
+    s = _GLUED_PREP.sub(r"\1 от \2", s)
+    for rx in _MARKETING:
+        s = rx.sub("", s)
+    # Гола единица накрая
+    s = _TRAILING_UNIT.sub("", s)
+
+    out = re.sub(r"\s+", " ", s).strip(" -–—·,")
+    # Предпазител: ако правилата са изяли смисъла, връщаме оригинала.
+    if sum(c.isalpha() for c in out) < 3:
+        return re.sub(r"\s+", " ", name or "").strip()
+    return out
 
 
 def looks_glued(name):
@@ -2055,6 +2122,20 @@ AI_PROMPT_VER = 2
 
 def enrich_ai():
     import os
+    # Собствен краен срок за етикетирането.
+    #
+    # Мери се от старта на ЦЕЛИЯ скрипт (_START), не от началото на тази
+    # функция — иначе би заобиколил главния предпазител time_budget_min.
+    # Подредбата е: обхождане (~30 мин) → етикетиране → писане на файлове.
+    # Workflow-ът има таймаут 90 мин, затова 70 оставя запас за комита.
+    #
+    # НЕ се казва out_of_time: така се казва глобалната функция за
+    # обхождането (ред ~884) и вложена дефиниция би я засенчила тихо.
+    ai_deadline_s = float(CFG.get("ai_deadline_min", 70)) * 60
+
+    def ai_out_of_time():
+        return (_time.time() - _START) > ai_deadline_s
+
     labels = _labels_prev()
     today = datetime.date.today().isoformat()
 
@@ -2086,6 +2167,9 @@ def enrich_ai():
         batch_names = [n for _, n in fresh[:max_new]]
         key_of = {n: k for k, n in fresh[:max_new]}
         for i in range(0, len(batch_names), 80):
+            if ai_out_of_time():
+                note("ai", f"време изтече — спирам на {i} от {len(batch_names)} нови")
+                break
             chunk = batch_names[i:i + 80]
             try:
                 got = _ai_batch(chunk, key, model)
@@ -2104,11 +2188,19 @@ def enrich_ai():
     # пускане без нови имена миграцията пак трябва да върви.
     # Половин бюджет, за да остане място за досъбирането на канонични имена.
     if key and stale:
-        room = min(max_new - done, max(1, max_new // 2))
+        # Досега беше половин бюджет, за да остане място за досъбирането
+        # на канонични имена. Но то е 0 от няколко пускания насам, а
+        # чакащите за преетикетиране са десетки хиляди — по-полезно е
+        # миграцията да върви бързо. Пази я времевият предпазител.
+        room = max_new - done
         if room > 0:
             redo_names = [n for _, n in stale[:room]]
             redo_key = {n: k for k, n in stale[:room]}
             for i in range(0, len(redo_names), 80):
+                if ai_out_of_time():
+                    note("ai", f"време изтече — преетикетирани {relabeled} "
+                               f"от {len(redo_names)} планирани")
+                    break
                 chunk = redo_names[i:i + 80]
                 try:
                     got = _ai_batch(chunk, key, model)
@@ -2133,6 +2225,8 @@ def enrich_ai():
         redo = [k for k, v in labels.items()
                 if "p" not in v and v.get("l") == today][:room]
         for i in range(0, len(redo), 80):
+            if ai_out_of_time():
+                break
             chunk = redo[i:i + 80]
             try:
                 got = _ai_batch(chunk, key, model)
