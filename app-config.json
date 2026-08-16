@@ -1,0 +1,38 @@
+{
+  "_": "КОНФИГУРАЦИЯ НА ПРИЛОЖЕНИЕТО — не бъркай с config.json (той е на скрейпъра)",
+  "_как_работи": "Промо Радар тегли този файл при всяко пускане. Смениш ли адрес тук, всички телефони се оправят БЕЗ нова версия в Google Play.",
+  "_внимание": "configVersion ТРЯБВА да съвпада с RemoteConfig.CONFIG_VERSION в приложението. Не съвпадне ли, файлът се пренебрегва и важат вградените стойности.",
+
+  "configVersion": 1,
+
+  "_1_фийд": "Откъде приложението чете готовите данни",
+  "feedUrl": "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data/data/data.json",
+
+  "_2_страници": "Адресите, които се четат директно от телефона при дълбока проверка",
+  "kauflandPages": [
+    "https://www.kaufland.bg/aktualni-predlozheniya/ot-ponedelnik.html",
+    "https://www.kaufland.bg/aktualni-predlozheniya/oferti.html"
+  ],
+  "metroStaticPages": ["https://www.metro.bg/"],
+  "metroJsPages": [
+    "https://www.metro.bg/oferti/top-oferti",
+    "https://www.metro.bg/oferti"
+  ],
+  "billaUrl": "https://www.billa.bg/promocii",
+  "lidlBrochureUrl": "https://www.lidl.bg/c/broshura/s10020060",
+  "ebagProductBase": "https://www.ebag.bg/x/",
+  "foodDataBase": "https://kolkostruva.bg/opendata_files/",
+
+  "_3_партньорски": "Празно = директни линкове към магазина. Виж MONETIZACIA.md.",
+  "_3_бележка": "ЗЗП изисква партньорският характер да е обозначен ДО самия линк, не само в настройките.",
+  "affiliateTemplate": "",
+
+  "_4_подаване": "Празно = функциите работят само на телефона, нищо не се изпраща",
+  "_4_бележка": "Включиш ли submitUrl, приложението започва да събира лични данни — обнови Data Safety в Play Console и политиката за поверителност ПРЕДИ това.",
+  "submitUrl": "",
+  "submitFields": {},
+  "communityCsvUrl": "",
+  "reportUrl": "",
+  "reportFields": {},
+  "priceReportUrl": ""
+}
