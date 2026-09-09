@@ -5,17 +5,58 @@ import unittest
 import json
 import tempfile
 import re
+import datetime
+import csv
+import io
 from unittest.mock import Mock
 from validate_feed import validate
 
 SOURCE = pathlib.Path(__file__).with_name("scraper.py")
 tree = ast.parse(SOURCE.read_text(encoding="utf-8-sig"))
-namespace = {"EUR_RATE": 1.95583, "CFG": {}, "UA": {}, "json": json, "re": re}
+namespace = {"EUR_RATE": 1.95583, "CFG": {}, "UA": {}, "json": json, "re": re,
+             "datetime": datetime, "csv": csv, "io": io}
 for node in tree.body:
-    if isinstance(node, ast.FunctionDef) and node.name in {"collapse_currency", "pick_price_pair", "build_history", "publication_exclusion", "quarantine_unsafe_rows"}:
+    if isinstance(node, ast.FunctionDef) and node.name in {"collapse_currency", "pick_price_pair", "build_history", "publication_exclusion", "quarantine_unsafe_rows", "official_record", "_read_csv", "_read_xlsx"}:
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(SOURCE), "exec"), namespace)
 
 class CurrencyTests(unittest.TestCase):
+    def test_official_milk_is_97_euro_cents_not_50(self):
+        with unittest.mock.patch.dict(namespace, {"enrich": lambda x: x}):
+            row = namespace["official_record"]("ТАРИТА", "ПРЯСНО МЛЯКО БОР-ЧВОР 3% 1л", .97, "2026-09-08")
+        self.assertEqual(row["price"], 1.90)
+        self.assertEqual(round(row["price"] / 1.95583, 2), .97)
+        self.assertEqual(row["sourceCurrency"], "EUR")
+        self.assertEqual(row["sourcePrice"], .97)
+
+    def test_currency_cutover_is_date_based_not_price_based(self):
+        with unittest.mock.patch.dict(namespace, {"enrich": lambda x: x}):
+            old = namespace["official_record"]("a", "milk", .97, "2025-12-31")
+            new = namespace["official_record"]("a", "milk", .97, "2026-01-01")
+            self.assertEqual(old["price"], .97)
+            self.assertEqual(old["sourceCurrency"], "BGN")
+            self.assertEqual(new["price"], 1.90)
+            with self.assertRaises(ValueError):
+                namespace["official_record"]("a", "milk", .97, "")
+
+    def test_real_csv_path_normalizes_before_enrichment(self):
+        raw = '"Наименование на продукта","Цена на дребно","Цена в промоция"\n"Мляко 1л","0.97",""'.encode()
+        rows = []
+        with unittest.mock.patch.dict(namespace, {"norm_chain": lambda x: x, "enrich": lambda x: {**x, "unitPrice": x["price"]}}):
+            namespace["_read_csv"](raw, "ТАРИТА", rows, "2026-09-08")
+        self.assertEqual(rows[0]["price"], 1.90)
+        self.assertEqual(rows[0]["unitPrice"], 1.90)
+
+    def test_xlsx_path_uses_same_conversion(self):
+        from openpyxl import Workbook
+        wb = Workbook()
+        wb.active.append(["Наименование на продукта", "Цена на дребно"])
+        wb.active.append(["Мляко 1л", .97])
+        buf = io.BytesIO(); wb.save(buf)
+        rows = []
+        with unittest.mock.patch.dict(namespace, {"norm_chain": lambda x: x, "enrich": lambda x: x}):
+            namespace["_read_xlsx"](buf.getvalue(), "ТАРИТА", rows, "2026-09-08")
+        self.assertEqual(rows[0]["price"], 1.90)
+
     def test_all_declared_discounts_normalize_eur(self):
         for pct in range(1, 96):
             with self.subTest(pct=pct):
@@ -94,6 +135,18 @@ class PublicationTests(unittest.TestCase):
     def test_currency_regression_fails(self):
         self.write("feed/search.json", {"updated": "2026-09-09", "items": [{"n": "Стълба 17,49 €", "p": 17.49}]})
         self.assertTrue(any("Unnormalized EUR" in e for e in validate(self.root)))
+
+    def test_official_milk_without_currency_in_name_still_fails(self):
+        row = {"s": "a", "n": "Мляко 1л", "p": .97, "f": 1,
+               "sourcePrice": .97, "sourceCurrency": "EUR", "sourceDate": "2026-09-08",
+               "normalization": "kzp-currency-v1"}
+        self.write("feed/search.json", {"updated": "2026-09-09", "items": [row]})
+        self.write("feed/basics.json", {"updated": "2026-09-09", "basics": [{"chain": "a", "product": "Мляко 1л", "price": .97}]})
+        self.assertTrue(any("conversion mismatch" in e for e in validate(self.root)))
+        row["p"] = 1.90
+        self.write("feed/search.json", {"updated": "2026-09-09", "items": [row]})
+        self.write("feed/basics.json", {"updated": "2026-09-09", "basics": [{"chain": "a", "product": "Мляко 1л", "price": 1.90}]})
+        self.assertEqual(validate(self.root), [])
 
     def test_coverage_collapse_fails(self):
         self.write("baseline/feed/index.json", {"stores": [{"slug": "a", "count": 3}]})

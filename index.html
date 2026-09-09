@@ -1277,7 +1277,7 @@ async function boot() {
     // Работникът съобщава, когато е активирал нова версия. Без това човек
     // гледа стар код и не разбира защо поправката я няма.
     navigator.serviceWorker.addEventListener("message", ev => {
-      if (ev.data && ev.data.pr === "updated") S.swUpdated = true;
+      if (ev.data && ev.data.pr === "updated") { S.swUpdated = true; render(); }
     });
   }
   applyTheme();
@@ -1344,7 +1344,17 @@ function applyLabels(f) {
 async function loadSearch() {
   const f = await feed("feed/search.json");
   if (f && S.idx && f.updated !== S.idx.updated) return null;
-  return f ? f.items.filter(it => it.n && !uncertainCurrency(it.s, it.n, it.p, it.o, null, it.currency)).map(cleanRow) : null;
+  return f ? f.items.filter(it => it.n && officialCurrencySafe(it) && !uncertainCurrency(it.s, it.n, it.p, it.o, null, it.currency)).map(cleanRow) : null;
+}
+function officialCurrencySafe(it) {
+  // Never show the old EUR-as-BGN official feed, including offline fallback.
+  if (it.f !== 1) return true;
+  if (it.normalization !== "kzp-currency-v1" || it.currency !== "BGN" ||
+      !Number.isFinite(it.sourcePrice) || it.sourcePrice <= 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(it.sourceDate || "")) return false;
+  const expectedCurrency = it.sourceDate >= "2026-01-01" ? "EUR" : "BGN";
+  const expected = Math.round(it.sourcePrice * (expectedCurrency === "EUR" ? EUR : 1) * 100) / 100;
+  return it.sourceCurrency === expectedCurrency && Math.abs(it.p - expected) < .001;
 }
 function cleanRow(it) {
   it.requiresCard = it.requiresCard ?? /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(it.n);
@@ -1374,6 +1384,8 @@ const isJunk = o => uncertainCurrency(o.store, o.rawName || o.name || "", o.pric
 function render() {
   $("view").innerHTML = S.tab === "today" ? viewToday()
     : S.tab === "list" ? viewList() : viewMore();
+  if (S.swUpdated && S.tab !== "today") $("view").innerHTML =
+    '<div class="panel">Има обновление на сайта. <button class="chip" data-reload>Презареди</button></div>' + $("view").innerHTML;
   document.querySelectorAll(".nav button").forEach(b =>
     b.classList.toggle("on", b.dataset.tab === S.tab));
   bind();
@@ -1764,6 +1776,7 @@ function basketAmount(item) {
     ["кг","л","бр"].includes(a.unit) ? a : basketDefault(item);
 }
 function basketQuote(h, amount) {
+  if (!officialCurrencySafe(h)) return null;
   if (!Number.isFinite(amount.quantity) || amount.quantity <= 0 || amount.quantity > 1000 ||
       !Number.isFinite(h.p) || h.p <= 0 || (h.currency && h.currency !== "BGN")) return null;
   if (h.requiresCard === true || /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(h.n)) return null;

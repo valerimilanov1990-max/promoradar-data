@@ -98,7 +98,7 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "labelFor", "typeOf", "esc", "safeUrl", "unitLbl", "matchScore",
   "render", "openDetail", "viewToday", "viewList", "viewMore",
   "iconOf", "GLYPH", "ICON_FOR", "thumb", "comparableRows",
-  "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency"];
+  "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -130,6 +130,15 @@ ok("Разпознава сгрешена валута от стар фийд", 
 ok("Скрива неясна валута в стария Кауфланд", ctx.uncertainCurrency("Кауфланд","Козметика",4.39,9.20,52,""));
 ok("Приема изрично нормализирана валута", !ctx.uncertainCurrency("Кауфланд","Козметика",8.59,17.99,52,"BGN"));
 ok("Не приема нечислово количество", ctx.basketQuote({n:"мляко",p:1,u:1,l:"лв/л"}, {quantity:NaN,unit:"л"}) === null);
+const milk = {s:"ТАРИТА", n:"ПРЯСНО МЛЯКО БОР-ЧВОР 3% 1л", f:1,
+  p:1.90, u:1.90, l:"лв/л", qty:1, qtyUnit:"л", currency:"BGN",
+  sourcePrice:.97, sourceCurrency:"EUR", sourceDate:"2026-09-08", normalization:"kzp-currency-v1"};
+const milkQuote = ctx.basketQuote(milk, {quantity:1,unit:"л"});
+ok("Мляко 0.97 EUR от КЗП струва 0.97 EUR, не 0.50", milkQuote && Math.abs(milkQuote.total / 1.95583 - .97) < .001);
+ok("Два литра са две опаковки за 1.94 EUR", Math.abs(ctx.basketQuote(milk,{quantity:2,unit:"л"}).total / 1.95583 - 1.94) < .001);
+ok("Отхвърля стар официален кеш без маркер", !ctx.officialCurrencySafe({...milk,normalization:undefined,p:.97}));
+ok("Отхвърля двойно превалутиране и с наличен маркер", !ctx.officialCurrencySafe({...milk,p:.97}));
+ok("Корекцията не променя други източници", ctx.officialCurrencySafe({f:0,p:.97}));
 }
 async function main() {
 if (process.argv.includes("--contract-only")) { contractTests(); console.log(pass+" passed; "+fail+" failed"); process.exit(fail ? 1 : 0); }
@@ -137,7 +146,7 @@ await ensureFeed();
 const t0 = Date.now();
 S.idx = rd("index.json");
 ctx.applyLabels(rd("labels.json"));
-S.search = rd("search.json").items.filter(i => i.n && !ctx.uncertainCurrency(i.s, i.n, i.p, i.o, null, i.currency)).map(ctx.cleanRow);
+S.search = rd("search.json").items.filter(i => i.n && ctx.officialCurrencySafe(i) && !ctx.uncertainCurrency(i.s, i.n, i.p, i.o, null, i.currency)).map(ctx.cleanRow);
 S.history = rd("history.json");
 const rawOffers = [];
 for (const s of S.idx.stores) {

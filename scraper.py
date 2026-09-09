@@ -1277,7 +1277,23 @@ def norm_chain(raw):
     return clean[:24] if len(clean) >= 2 else None
 
 
-def _read_csv(raw, chain, rows):
+def official_record(chain, name, price, source_date):
+    """KZP submissions switched to EUR on 2026-01-01; storage stays BGN.
+
+    Convert exactly once at ingestion, BEFORE quantity/unit-price enrichment.
+    Source: https://www.kolkostruva.bg/compare
+    """
+    day = datetime.date.fromisoformat(source_date)
+    source_currency = "EUR" if day >= datetime.date(2026, 1, 1) else "BGN"
+    stored = round(price * EUR_RATE, 2) if source_currency == "EUR" else round(price, 2)
+    return enrich({"chain": chain, "product": name, "name": name,
+                   "price": stored, "sourcePrice": price,
+                   "sourceCurrency": source_currency, "sourceDate": source_date,
+                   "normalization": "kzp-currency-v1"})
+
+
+def _read_csv(raw, chain, rows, source_date):
+    datetime.date.fromisoformat(source_date)  # fail before per-row error handling
     for enc in ("utf-8-sig", "windows-1251", "utf-8"):
         try:
             textdata = raw.decode(enc)
@@ -1308,13 +1324,13 @@ def _read_csv(raw, chain, rows):
             nmv = row[pc].strip()
             ch = norm_chain(chain)
             if ch and nmv and 0 < price < 1000:
-                rows.append(enrich({"chain": ch, "product": nmv,
-                                    "name": nmv, "price": price}))
+                rows.append(official_record(ch, nmv, price, source_date))
         except Exception:
             pass
 
 
-def _read_xlsx(blob, chain, rows):
+def _read_xlsx(blob, chain, rows, source_date):
+    datetime.date.fromisoformat(source_date)
     from openpyxl import load_workbook
     wb = load_workbook(io.BytesIO(blob), read_only=True)
     ws = wb.active
@@ -1337,8 +1353,7 @@ def _read_xlsx(blob, chain, rows):
             nmv = str(row[pc] or "").strip()
             ch = norm_chain(chain)
             if ch and nmv and 0 < price < 1000:
-                rows.append(enrich({"chain": ch, "product": nmv,
-                                    "name": nmv, "price": price}))
+                rows.append(official_record(ch, nmv, price, source_date))
         except Exception:
             pass
 
@@ -1572,9 +1587,9 @@ def scrape_basics():
                     continue                      # аптеки и пр. — не ги четем изобщо
                 try:
                     if low.endswith(".csv"):
-                        _read_csv(zf.read(nm), chain, rows)
+                        _read_csv(zf.read(nm), chain, rows, d)
                     elif low.endswith((".xlsx", ".xls")):
-                        _read_xlsx(zf.read(nm), chain, rows)
+                        _read_xlsx(zf.read(nm), chain, rows, d)
                 except Exception as e:
                     log_err(f"basics/{nm[:40]}", e)
             if rows:
@@ -1902,7 +1917,8 @@ def build_history():
             r = requests.get(f"{base}/{br}/feed/history.json",
                              headers=UA, timeout=30)
             if r.status_code == 200 and r.content:
-                candidate = json.loads(r.text).get("h")
+                previous_document = json.loads(r.text)
+                candidate = previous_document.get("h")
                 if isinstance(candidate, dict) and candidate:
                     prev = candidate
                     break
@@ -1915,6 +1931,16 @@ def build_history():
 
     today = datetime.date.today().isoformat()
     h = dict(prev)
+    if any(h.get(_hist_key(b["chain"], b["product"]), {}).get("normalization") != "kzp-currency-v1"
+           for b in OUT["basics"]):
+        # Old history mixes source currencies and sometimes shares keys with
+        # offers. Do not guess historical conversions or create fake increases.
+        # Retain each key but restart the affected curve at its corrected value.
+        for b in OUT["basics"]:
+            key = _hist_key(b["chain"], b["product"])
+            if key in h and h[key].get("normalization") != "kzp-currency-v1":
+                h[key] = {"d": [], "p": [], "l": today,
+                          "resetReason": "kzp-currency-v1"}
     changed = 0
 
     def add(store, name, price, cap):
@@ -1944,6 +1970,7 @@ def build_history():
     # нямаше нито една точка.
     for b in OUT["basics"]:
         add(b["chain"], b["product"], b.get("price"), HISTORY_MAX_POINTS_BASIC)
+        h[_hist_key(b["chain"], b["product"])]["normalization"] = "kzp-currency-v1"
 
     # чистене: продукти, които никой не е виждал отдавна
     cutoff = (datetime.date.today()
@@ -2594,6 +2621,7 @@ def write_output():
     sizes["basics"] = _dump("feed/basics.json",
                             {"updated": OUT["updated"],
                              "date": OUT.get("basics_date", ""),
+                             "normalization": "kzp-currency-v1",
                              "chains": chains,
                              "basics": OUT["basics"]})
 
@@ -2607,7 +2635,8 @@ def write_output():
     if OUT["history"]:
         sizes["history"] = _dump("feed/history.json",
                                  {"updated": OUT["updated"],
-                                  "h": OUT["history"]})
+                                  "h": OUT["history"],
+                                  "normalization": "kzp-currency-v1"})
 
     # --- дневният дайджест (бележката на деня) ---
     if OUT.get("digest"):
@@ -2661,7 +2690,13 @@ def write_output():
     for b in OUT["basics"]:
         idx.append({"s": b["chain"], "n": b["product"], "p": b["price"],
                     "o": None, "u": b.get("unitPrice"),
-                    "l": b.get("unitLabel", ""), "f": 1})
+                    "l": b.get("unitLabel", ""), "f": 1,
+                    "currency": b.get("currency"), "qty": b.get("qty"),
+                    "qtyUnit": b.get("qtyUnit", ""),
+                    "sourcePrice": b.get("sourcePrice"),
+                    "sourceCurrency": b.get("sourceCurrency"),
+                    "sourceDate": b.get("sourceDate"),
+                    "normalization": b.get("normalization")})
     for c in OUT["community"]:
         idx.append({"s": c["chain"], "n": c["product"], "p": c["price"],
                     "o": None, "u": c.get("unitPrice"),

@@ -42,6 +42,28 @@ def validate(root, baseline=None):
         eur = [float(x.replace(',', '.')) for x in re.findall(r"(\d+[.,]\d{2})\s*(?:€|EUR)", row.get("n", ""), re.I)]
         if eur and any(abs(price - x) < 0.02 for x in eur) and not any(abs(price / 1.95583 - x) < 0.02 for x in eur):
             errors.append(f"Unnormalized EUR: {row.get('n')}")
+        if row.get("f") == 1:
+            source = row.get("sourcePrice")
+            date = row.get("sourceDate", "")
+            currency = "EUR" if date >= "2026-01-01" else "BGN"
+            if (row.get("normalization") != "kzp-currency-v1"
+                    or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)
+                    or row.get("sourceCurrency") != currency
+                    or not isinstance(source, (int, float)) or not math.isfinite(source)
+                    or source <= 0):
+                errors.append(f"Missing official price provenance: {row.get('n')}")
+            elif abs(price - round(source * (1.95583 if currency == "EUR" else 1), 2)) > 0.001:
+                errors.append(f"Official currency conversion mismatch: {row.get('n')}")
+    if any(row.get("f") == 1 for row in rows):
+        basics = read("feed/basics.json")
+        if basics.get("updated") != index.get("updated"):
+            errors.append("Basics/index snapshot mismatch")
+        lookup = {(b["chain"], b["product"]): b for b in basics.get("basics", [])}
+        for row in rows:
+            if row.get("f") == 1:
+                b = lookup.get((row.get("s"), row.get("n")))
+                if not b or b.get("price") != row.get("p") or b.get("unitPrice") != row.get("u"):
+                    errors.append(f"Basics/search price mismatch: {row.get('n')}")
     if baseline and (baseline / "feed/index.json").exists():
         previous = json.loads((baseline / "feed/index.json").read_text(encoding="utf-8-sig"))
         counts = {r["slug"]: r["count"] for r in index.get("stores", [])}
