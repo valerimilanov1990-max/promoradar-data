@@ -2702,6 +2702,46 @@ def write_output():
     _dump("data.json", OUT)
 
 
+def publication_exclusion(row):
+    """Quarantine uncertain prices; never guess their currency from a name."""
+    name = str(row.get("name") or row.get("product") or "")
+    if re.search(r"(?<![\w])(?:цигар\w*|тютюн\w*|никотин\w*|вейп\w*|"
+                 r"cigarettes?|tobacco|nicotine|vapes?|heets|terea|iqos|"
+                 r"marlboro|winston|rothmans|merilyn|мерилин|dunhill|"
+                 r"kent|camel|lucky\s+strike|pall\s+mall|parliament|"
+                 r"the\s+king\s+(?:core|cent|x-cut)|corset\s+(?:lilas|marine|white|pink))"
+                 r"(?![\w])", name, re.I):
+        return "restricted_tobacco_nicotine"
+    price = row.get("price")
+    if not isinstance(price, (int, float)):
+        return "invalid_price"
+    eur = [float(x.replace(',', '.')) for x in re.findall(
+        r"(\d+[.,]\d{2})\s*(?:€|EUR)", name, re.I)]
+    if (eur and any(abs(price - x) < 0.02 for x in eur)
+            and not any(abs(price / EUR_RATE - x) < 0.02 for x in eur)):
+        return "ambiguous_eur_storage"
+    return None
+
+
+def quarantine_unsafe_rows(output):
+    quarantine = []
+    for section in ("offers", "basics", "community", "ebag"):
+        kept = []
+        for row in output.get(section, []):
+            reason = publication_exclusion(row)
+            if reason:
+                quarantine.append({"section": section, "reason": reason, "row": row})
+            else:
+                kept.append(row)
+        output[section] = kept
+    counts = {}
+    for item in quarantine:
+        key = item["section"] + ":" + item["reason"]
+        counts[key] = counts.get(key, 0) + 1
+    output.setdefault("stats", {})["quarantined_rows"] = counts
+    return quarantine
+
+
 # ---------------------------------------------------------------------------
 def main():
     ctx = browser = None
@@ -2727,6 +2767,7 @@ def main():
     scrape_basics()
     scrape_community()
     scrape_reports()
+    quarantine = quarantine_unsafe_rows(OUT)
     build_history()
     build_geo()
     enrich_ai()
@@ -2740,6 +2781,8 @@ def main():
         1 for o in OUT["offers"] + OUT["basics"] if "unitPrice" in o)
 
     write_output()
+    # Diagnostic artifact only: not included in the published data branch.
+    _dump("quarantine.json", {"updated": OUT["updated"], "items": quarantine})
 
     print(f"ebag={len(OUT['ebag'])} offers={len(OUT['offers'])} "
           f"basics={len(OUT['basics'])} errors={len(OUT['errors'])}")

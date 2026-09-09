@@ -4,14 +4,15 @@ import pathlib
 import unittest
 import json
 import tempfile
+import re
 from unittest.mock import Mock
 from validate_feed import validate
 
 SOURCE = pathlib.Path(__file__).with_name("scraper.py")
 tree = ast.parse(SOURCE.read_text(encoding="utf-8-sig"))
-namespace = {"EUR_RATE": 1.95583, "CFG": {}, "UA": {}, "json": json}
+namespace = {"EUR_RATE": 1.95583, "CFG": {}, "UA": {}, "json": json, "re": re}
 for node in tree.body:
-    if isinstance(node, ast.FunctionDef) and node.name in {"collapse_currency", "pick_price_pair", "build_history"}:
+    if isinstance(node, ast.FunctionDef) and node.name in {"collapse_currency", "pick_price_pair", "build_history", "publication_exclusion", "quarantine_unsafe_rows"}:
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(SOURCE), "exec"), namespace)
 
 class CurrencyTests(unittest.TestCase):
@@ -38,6 +39,31 @@ class CurrencyTests(unittest.TestCase):
     def test_empty_and_invalid(self):
         self.assertEqual(namespace["collapse_currency"]([], []), [])
         self.assertEqual(namespace["collapse_currency"]([0, -1], []), [])
+
+class QuarantineTests(unittest.TestCase):
+    def test_live_currency_regression_is_quarantined_not_repriced(self):
+        row = {"product": "Маслини Каламата € 7,79 €", "price": 7.79}
+        output = {"basics": [row]}
+        rejected = namespace["quarantine_unsafe_rows"](output)
+        self.assertEqual(output["basics"], [])
+        self.assertEqual(rejected[0]["reason"], "ambiguous_eur_storage")
+        self.assertEqual(row["price"], 7.79)
+
+    def test_correctly_normalized_prices_and_coffee_survive(self):
+        for name, price in [("Маслини 7,79 €", 15.24), ("Davidoff кафе", 10), ("Кентъки сос", 3)]:
+            self.assertIsNone(namespace["publication_exclusion"]({"name": name, "price": price}))
+
+    def test_live_tobacco_variants_are_excluded(self):
+        for name in ["ЦИГАРИ МЕРИЛИН СЛИМС", "Merilyn Pink Slims FP", "THE KING CORE RED 100 LS", "CORSET LILAS HOLLOW FILTER", "ROTHMANS BLUE CLASSIC", "Вейп", "IQOS TEREA"]:
+            self.assertEqual(namespace["publication_exclusion"]({"name": name, "price": 3}), "restricted_tobacco_nicotine", name)
+
+    def test_every_price_surface_filtered_and_audited(self):
+        output = {section: [{"name": "мляко", "price": 2}, {"name": "цигари", "price": 7}]
+                  for section in ["offers", "basics", "community", "ebag"]}
+        self.assertEqual(len(namespace["quarantine_unsafe_rows"](output)), 4)
+        self.assertEqual(len(output["stats"]["quarantined_rows"]), 4)
+        self.assertEqual(len(output["offers"]), 1)
+
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):

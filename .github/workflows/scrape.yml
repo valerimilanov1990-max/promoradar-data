@@ -81,6 +81,15 @@ jobs:
             data.json
             feed/
 
+      - name: Keep quarantine diagnostics even when gates fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarantine-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: quarantine.json
+
       # ------------------------------------------------------------------
       # Данните отиват в ОТДЕЛЕН клон "data" с история от един-единствен
       # комит. Иначе всекидневният многомегабайтов файл се трупа в git
