@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Промо Радар — всички намаления и официалните цени</title>
-<meta name="description" content="Намаленията от всички вериги и официалните дневни цени на България, на едно място. Безплатно, без реклами.">
+<title>Промо Радар — твоят списък, по-добра сметка</title>
+<meta name="description" content="Сравни цените за твоя списък, избери количества и следи интересните продукти в покритите магазини.">
 <meta name="theme-color" content="#13372E" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#DFF3EA" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,22 +22,34 @@
   --mint16:rgba(63,221,162,.16); --mint55:rgba(63,221,162,.55);
   --herobg:linear-gradient(100deg,#13372E,#152736,#231B4A);
   --heroon:#FFFFFF; --herosub:rgba(63,221,162,.65);
+  --badgebg:linear-gradient(90deg,var(--coral),#FFA95E);
+  --badgefg:var(--ink); --mintfg:var(--ink);
 }
 /* Тема като телефона: същата премерена светла палитра като приложението
-   (мента 5.0:1, текст 16.6:1 върху бяло) — включва се сама. */
+   (мента 5.0:1, текст 16.6:1 върху бяло). Включва се сама по системната
+   настройка, но ръчният избор в „Още“ я преодолява — затова правилата са
+   два пъти: веднъж по медия, веднъж по data-theme на <html>. */
 @media (prefers-color-scheme: light) {
-  :root {
+  html:not([data-theme="dark"]) {
     --ink:#F5F7FB; --panel:#FFFFFF; --panelhi:#EEF2F8; --line:#E1E8F0;
     --hi:#12202B; --lo:#55677A; --mint:#00805A; --coral:#C41E2E;
     --amber:#8A5B00; --violet:#5B46C8;
     --mint16:rgba(0,128,90,.12); --mint55:rgba(0,128,90,.5);
     --herobg:linear-gradient(100deg,#DFF3EA,#E9F1FF,#F3EEFF);
-    --heroon:#123528; --herosub:#00674A;
+    --heroon:#123528; --herosub:#00674A; --shadow:0 1px 4px rgba(18,32,43,.06);
+    --badgebg:var(--coral); --badgefg:#fff; --mintfg:#fff;
   }
-  .card, .panel, .litem { box-shadow:0 1px 4px rgba(18,32,43,.06); }
-  .badge { color:#fff; }
-  .pill.mintf { color:#fff; }
 }
+html[data-theme="light"] {
+  --ink:#F5F7FB; --panel:#FFFFFF; --panelhi:#EEF2F8; --line:#E1E8F0;
+  --hi:#12202B; --lo:#55677A; --mint:#00805A; --coral:#C41E2E;
+  --amber:#8A5B00; --violet:#5B46C8;
+  --mint16:rgba(0,128,90,.12); --mint55:rgba(0,128,90,.5);
+  --herobg:linear-gradient(100deg,#DFF3EA,#E9F1FF,#F3EEFF);
+  --heroon:#123528; --herosub:#00674A; --shadow:0 1px 4px rgba(18,32,43,.06);
+  --badgebg:var(--coral); --badgefg:#fff; --mintfg:#fff;
+}
+.card, .panel, .litem { box-shadow:var(--shadow,none); }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { margin:0; background:var(--ink); color:var(--hi);
   font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
@@ -85,18 +97,27 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
 .cat span { font-size:17px; } .cat u { text-decoration:none; opacity:.55; }
 .cat.on { background:var(--mint16); border-color:var(--mint55); color:var(--mint); }
 
-.card { display:flex; align-items:center; gap:12px; background:var(--panel);
-  border-radius:18px; margin:10px 0; overflow:hidden; cursor:pointer; min-height:76px; }
-.card .bar { width:4px; align-self:stretch; flex:none; }
-.card img { width:60px; height:60px; object-fit:contain; border-radius:12px;
-  background:var(--panelhi); flex:none; }
-.noimg { width:60px; height:60px; border-radius:12px; background:var(--panelhi);
-  display:flex; align-items:center; justify-content:center; font-weight:800; flex:none; }
-.mid { flex:1; min-width:0; padding:10px 0; }
-.tag { display:flex; align-items:center; gap:5px; font-size:10.5px;
-  font-weight:800; letter-spacing:.8px; }
-.tag i { width:7px; height:7px; border-radius:50%; display:inline-block; }
-.nm { font-weight:600; font-size:13.5px; margin:3px 0;
+/* Картата: плочка с обраꙁ отляво, име в средата, цена отдясно.
+   Веригата вече не е дебела лента отстрани, а тънък кант плюс точка до
+   името — лентата крадеше място и не казваше нищо повече от точката. */
+.card { display:flex; align-items:center; gap:13px; background:var(--panel);
+  border-radius:16px; margin:9px 0; padding:11px 13px; cursor:pointer;
+  border-left:3px solid var(--sc,var(--line)); }
+.card:active { transform:scale(.995); }
+/* Плочката. Снимка и икона заемат ЕДНО И СЪЩО място, за да не подскача
+   редът, когато едните ги има, а другите — не. */
+.th { flex:none; border-radius:14px; background:var(--panelhi);
+  display:flex; align-items:center; justify-content:center; overflow:hidden; }
+img.th { object-fit:contain; }
+.th.ico { background:color-mix(in srgb, var(--ic) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--ic) 22%, transparent); }
+.mid { flex:1; min-width:0; }
+/* Името е героят, не веригата. Затова тя е дребна и приглушена, с точка
+   в цвета си — четеш продукта, после откъде е. */
+.tag { display:flex; align-items:center; gap:5px; font-size:11px;
+  font-weight:700; letter-spacing:.6px; color:var(--lo); }
+.tag i { width:7px; height:7px; border-radius:50%; display:inline-block; flex:none; }
+.nm { font-weight:500; font-size:14px; line-height:1.35; margin:3px 0;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .pill { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px;
   border-radius:7px; border:1px solid; }
@@ -104,15 +125,15 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
   background:rgba(247,194,102,.12); }
 .pill.violet { color:var(--violet); border-color:rgba(166,149,242,.45);
   background:rgba(166,149,242,.12); margin-left:6px; }
-.pill.mintf { color:var(--ink); background:var(--mint); border-color:var(--mint); }
-.pr { text-align:right; padding:10px 12px 10px 0; flex:none; display:flex;
+.pill.mintf { color:var(--mintfg); background:var(--mint); border-color:var(--mint); }
+.pr { text-align:right; flex:none; display:flex;
   flex-direction:column; align-items:flex-end; gap:1px; }
-.pr b { font-size:19px; color:var(--mint); font-weight:900; letter-spacing:-.5px; }
+.pr b { font-size:20px; color:var(--mint); font-weight:800; letter-spacing:-.5px; }
 .pr b em { font-style:normal; font-size:11px; margin-left:2px; }
 .pr b.hot { color:var(--coral); }
 .pr s { color:var(--lo); font-size:11px; }
 .pr small { color:var(--lo); font-size:11px; }
-.badge { background:linear-gradient(90deg,var(--coral),#FFA95E); color:var(--ink);
+.badge { background:var(--badgebg); color:var(--badgefg);
   font-weight:900; font-size:11px; padding:2px 7px;
   border-radius:9px 3px 9px 3px; }
 .card.slim { min-height:60px; padding-left:0; }
@@ -135,7 +156,27 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
   border-radius:12px; font-weight:800; padding:12px 18px; cursor:pointer; font-size:14px; }
 .big { display:block; width:100%; margin:10px 0; }
 .panel { background:var(--panel); border-radius:16px; padding:12px 14px; margin:10px 0; }
-.rrow { padding:5px 0; cursor:pointer; } .rrow.sel { font-weight:800; }
+/* Победителят е ГОЛЯМ и очевидно натискаем. Досега класацията беше шест
+   еднакви реда с числа и нищо не подсказваше нито кое е важното, нито че
+   изобщо може да се натисне. */
+.win { display:flex; align-items:center; gap:10px; cursor:pointer;
+  background:var(--mint16); border:1px solid var(--mint55);
+  border-radius:14px; padding:12px 14px; margin-bottom:8px; }
+.winname { font-size:16px; font-weight:800; }
+.winsum { font-size:22px; font-weight:800; color:var(--mint); flex:none; }
+.rrow { display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:9px 10px; border-radius:11px; margin:4px 0; min-height:44px;
+  border:1px solid transparent; }
+.rrow:hover { background:var(--panelhi); }
+.rrow.sel { background:var(--panelhi); border-color:var(--mint55); }
+.rrow > span:first-child { flex:1; min-width:0; font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rrow b { flex:none; }
+/* Редът за ИЗБРАНАТА верига се отличава от „другаде“ — иначе не се
+   разбира кой ред за кой магазин е. */
+.sub.here { background:var(--mint16); border-radius:9px; padding:5px 7px;
+  margin-left:28px; margin-top:6px; }
+.sub .mini { margin-left:auto; }
 .litem { background:var(--panel); border-radius:14px; padding:10px 12px; margin:8px 0;
   position:relative; }
 .litem label { display:flex; align-items:center; gap:9px; font-weight:600; }
@@ -151,8 +192,8 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
 #sheet { background:var(--panel); border-radius:22px; max-width:560px;
   margin:0 auto; padding:18px; animation:pop .22s ease-out; }
 @keyframes pop { from { transform:scale(.94) translateY(8px); opacity:0; } }
-.dtop img { width:150px; height:150px; object-fit:contain; display:block;
-  margin:0 auto 10px; border-radius:14px; background:var(--panelhi); }
+.dhero { display:flex; justify-content:center; margin:0 0 12px; }
+.dhero .th { border-radius:20px; }
 #sheet h2 { font-size:16px; margin:6px 0; }
 #sheet h3 { font-size:11px; letter-spacing:1.4px; text-transform:uppercase;
   color:var(--lo); margin:18px 0 4px; padding-left:22px; position:relative; }
@@ -162,8 +203,23 @@ main { padding:12px 14px; max-width:640px; margin:0 auto; }
 .dprice b { font-size:26px; color:var(--mint); font-weight:900; }
 .dprice b.hot { color:var(--coral); }
 .dprice span, .dprice s { color:var(--lo); }
-.crow { background:var(--panelhi); border-radius:10px; padding:8px 10px; margin:5px 0;
-  display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+/* Подсказките при писане. Целта е ДА СЕ ВИЖДА разликата: „орехи ·
+   Бакалия“ и „орехите · марка · Месо и риба“ един под друг, с брой
+   вериги отдясно — така изборът е информиран, а не налучкване. */
+.sug { background:var(--panel); border-radius:14px; padding:4px; margin:8px 0; }
+.sugrow { display:flex; align-items:center; gap:9px; padding:8px 9px;
+  border-radius:10px; cursor:pointer; min-height:46px; }
+.sugrow:hover { background:var(--panelhi); }
+.sugt { flex:1; min-width:0; font-weight:600; font-size:14px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sugrow .mini { flex:none; }
+.sugrow b.mini { color:var(--mint); }
+
+.crow { background:var(--panelhi); border-radius:12px; padding:9px 11px; margin:6px 0;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.crow .th { border-radius:9px; }
+.crow .th + .tag { margin-left:0; }
+.sub .th { border-radius:7px; }
 .crow.best { background:rgba(63,221,162,.10); }
 .crow .cn { flex-basis:100%; font-size:11px; color:var(--lo);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -176,24 +232,67 @@ canvas { width:100%; display:block; }
   color:var(--mint); border:1px solid rgba(63,221,162,.4); border-radius:13px;
   padding:12px; font-weight:700; font-size:14px; text-decoration:none; cursor:pointer; }
 .btn.ghost { background:none; border-color:var(--line); color:var(--lo); }
-footer { text-align:center; color:var(--lo); font-size:11px; padding:18px 20px 8px; }
+footer { text-align:center; color:var(--lo); font-size:12px; padding:18px 20px 8px; }
 footer b { color:var(--mint); }
+
+/* --- Достъпност и палец ---
+   Пръстът иска 44 px. Чиповете бяха 34, а ✕ за триене на артикул — 22,
+   тоест по-малко от половината от препоръчаното. Шрифтовете под 11 px
+   също отпадат: .pill и .mini бяха 10.5. */
+.chip { min-height:40px; display:inline-flex; align-items:center; }
+.cat { min-height:52px; }
+.litem .x { min-width:44px; min-height:44px; right:4px; top:2px;
+  display:flex; align-items:center; justify-content:center; font-size:15px; }
+.litem > b { right:52px; }
+.litem .sub { min-height:34px; display:flex; align-items:center; gap:4px; }
+.pill, .mini { font-size:11.5px; }
+:focus-visible { outline:2px solid var(--mint); outline-offset:2px; border-radius:8px; }
+.crow[role="button"] { cursor:pointer; }
+.crow .chev { color:var(--lo); font-weight:800; margin-left:4px; }
+#sheet:focus { outline:none; }
+.themebtns { display:flex; gap:6px; }
+/* Radar 3.12 — quiet surfaces, readable products, one clear action. */
+:root{--ink:#141c18;--panel:#202b24;--panelhi:#2b3830;--line:#3d4a40;--hi:#e4ede3;--lo:#aab9ab;--mint:#cee6be;--violet:#aab9ab;--herobg:#141c18;--heroon:#e4ede3;--herosub:#aab9ab;--badgebg:#a64b35;--badgefg:#fff}
+@media(prefers-color-scheme:light){html:not([data-theme="dark"]){--ink:#f6f5ef;--panel:#fffef9;--panelhi:#eeeee4;--line:#d9dfd3;--hi:#193e2d;--lo:#626c61;--mint:#214b32;--violet:#626c61;--herobg:#f6f5ef;--heroon:#193e2d;--herosub:#626c61;--mint16:#e4edcf;--mint55:#8a9d70;--mintfg:#fffef9}}
+html[data-theme="light"]{--ink:#f6f5ef;--panel:#fffef9;--panelhi:#eeeee4;--line:#d9dfd3;--hi:#193e2d;--lo:#626c61;--mint:#214b32;--violet:#626c61;--herobg:#f6f5ef;--heroon:#193e2d;--herosub:#626c61;--mint16:#e4edcf;--mint55:#8a9d70;--mintfg:#fffef9}
+header{position:relative;padding:20px;max-width:680px;margin:auto;background:var(--ink)}
+header::after{display:none}h1{font-size:26px;font-weight:600;letter-spacing:-1px}h1 small{font-size:12px;letter-spacing:0}.logo s{animation:none}
+main{padding:8px 20px 20px}.home-intro{margin:2px 0 14px}.home-intro>span{font-size:11px;letter-spacing:1.5px;color:var(--lo)}
+.home-intro h2{font:500 36px/1.08 Georgia,serif;letter-spacing:-1px;margin:8px 0 14px}
+.home-list{width:100%;display:flex;justify-content:space-between;background:var(--mint);color:var(--mintfg);border:0;border-radius:10px;padding:15px;font:500 15px system-ui;cursor:pointer}
+.search input{font-size:16px;border:1px solid var(--line);background:var(--panel);border-radius:10px}
+.daily-note{font-size:12px;color:var(--lo);margin:12px 0}.daily-note summary,.store-filter summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.store-filter summary:after{content:"＋";margin-left:auto}
+.store-filter{border-bottom:1px solid var(--line)}.store-filter[open] summary:after{content:"−"}
+.chip,.cat{border-radius:8px;font-weight:500}.cat{background:transparent;border-color:transparent;min-height:44px;flex-direction:row;gap:5px}.cat u{display:none}.cat span{font-size:14px}
+.card{border:0;border-bottom:1px solid var(--line);border-radius:8px;padding:15px 12px;gap:12px;box-shadow:none;flex-wrap:wrap}
+.card>.th{width:60px!important;height:60px!important}.card>.mid{flex-basis:calc(100% - 84px)}.card>.pr{margin-left:auto;flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:6px 10px}.card>.pr b{font-size:25px}.card>.pr .badge{margin:0}
+.nm{font-size:16px;line-height:1.4}.tag{letter-spacing:0;font-weight:500}.th.ico{background:var(--panelhi);border:0;color:var(--lo)}
+.pill{border-radius:5px}.panel,.litem{border-radius:12px;box-shadow:none}.win{border-bottom:3px dotted var(--line);border-radius:10px;padding:16px;background:var(--panelhi)}.winname{font-weight:500}
+.big,.btn{border-radius:9px;min-height:44px}.nav{border-radius:0;box-shadow:none;border-top:1px solid var(--line);background:var(--panel)}.nav button{font-weight:500;font-size:14px}
+.basket-amount{display:flex;align-items:center;gap:8px;margin:8px 0 8px 28px;font-size:12px}
+.basket-amount input{width:80px}.basket-amount input,.basket-amount select{min-height:44px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line);border-radius:7px;padding:7px;font-size:16px}
+.dhero{float:right;margin:0 0 10px 12px}.dhero .th{width:68px!important;height:68px!important}.dtop h2{font-size:21px}.dbtns{clear:both;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.dbtns .btn{font-size:13px}.dbtns .btn[data-share],.dbtns .btn[data-close]{background:transparent;color:var(--lo);border:1px solid var(--line)}
+#sheet{background:var(--panel)}.note{line-height:1.5}footer{max-width:640px;margin:auto}
+@media(min-width:600px){.card{flex-wrap:nowrap}.card>.mid{flex-basis:auto}.home-intro h2{font-size:42px}}
 </style>
 </head>
 <body>
 <header>
   <div class="logo"><i></i><i></i><i></i><s></s><b></b></div>
-  <h1>ПРОМО РАДАР<small>всички намаления и официалните цени на България</small></h1>
+  <h1>радар<small>Твоят списък. По-добра сметка.</small></h1>
 </header>
 <main id="view"></main>
-<footer>Уеб версия само за разглеждане. Пълното приложение — с известия при
-намаление, скенер и джаджа — е за <b>Android</b>.<br>
+<footer>Уеб версията прави същото като приложението — търсене, сравнение,
+кошница, история. Само <b>известията при намаление</b>, джаджата и скенерът
+искат <b>Android</b>.<br>
 На iPhone: Сподели → „Добави към Начален екран“, за да стои като приложение.</footer>
 <nav class="nav">
-  <button data-tab="today" class="on">🏷 Днес</button>
-  <button data-tab="list">🛒 Списък</button>
+  <button data-tab="today" class="on">За теб</button>
+  <button data-tab="list">Кошница</button>
+  <button data-tab="more">⚙ Още</button>
 </nav>
-<div id="modal"><div id="sheet"></div></div>
+<div id="modal" role="dialog" aria-modal="true" aria-label="Детайли за продукта">
+  <div id="sheet" tabindex="-1"></div></div>
 <script>
 /* Промо Радар — уеб витрина върху същия фийд, който ползва приложението.
    Логиката (търсене, категории, кошница) е пренесена 1:1 от Kotlin кода —
@@ -232,7 +331,43 @@ const MARKERS = new Set(["с","със","вкус","аромат","за","без"
 const UNITS = new Set(["г","гр","кг","мл","л","ml","g","kg","l","бр","броя","х","x","см","cm","%"]);
 const qWords = s => s.toLowerCase().split(/[^0-9a-zа-яё]+/)
   .filter(w => w && !/^\d/.test(w) && !UNITS.has(w));
-const wordHit = (w, q) => w.startsWith(q) || (q.startsWith(w) && w.length >= 4);
+/* Колко силно съвпада една дума от името с една дума от заявката:
+     2 — думата в името ЗАПОЧВА със заявката („протеинов“ ⊃ „протеин“);
+     1 — само обратното: думата в името е НАЧАЛО на заявката. Това е
+         съкращение („КАШК.“ вместо кашкавал) и е слабо доказателство;
+     0 — няма.
+   Обратното правило е нужно, защото българските магазини съкращават
+   всичко: „ШАМП.SCHAUMA“, „ЛЮТЕН.ДЕРОНИ“, „БИСКВ.БАНАНОВА“. Но то е и
+   причината „протеин“ да намира ПАСТА ЗА ЗЪБИ: „PROT&CLEAN“ и
+   „КОМПЛ.ПРОТ.УАЙТЪНИНГ“ дават думата „прот“, а „протеин“ наистина
+   започва с нея. „Прот“ е и protection. */
+function hitKind(w, alts) {
+  let k = 0;
+  for (const a of alts) {
+    if (w.startsWith(a)) return 2;
+    if (a.startsWith(w) && w.length >= 4) k = 1;
+  }
+  return k;
+}
+/* Съкращението се проверява срещу типа от AI — той е видял цялото име и
+   казва какво Е стоката с нормални думи.
+   Три случая, в този ред:
+     · няма етикет → не гадаем, пускаме (2% от индекса);
+     · типът съдържа СЪЩОТО съкращение („лютен домашен едросмлян“) → и
+       AI-ят не го е разчел, значи нямаме нова информация → пускаме;
+     · типът е с разчетени думи и нито една не съвпада със заявката
+       („паста за зъби“ срещу „протеин“) → AI-ят знае какво е това и то
+       не е търсеното → отсяваме.
+   Обратната посока тук важи само при разлика до 2 букви: така „картоф“
+   минава за „картофи“ (окончание), но „prot“ не минава за „protein“. */
+function abbrevOk(name, alts, w) {
+  const t = typeOf(name);
+  if (!t) return true;
+  const tw = qWords(t);
+  if (tw.includes(w)) return true;
+  return tw.some(x => alts.some(a =>
+    x.startsWith(a) || (a.startsWith(x) && x.length >= 4 && a.length - x.length <= 2)));
+}
 
 /* Синоними и транслитерация — огледало на DataFeed. „Омар“ намира
    лобстер, „милка“ намира Milka. */
@@ -256,6 +391,10 @@ function altsFor(q) {
 }
 
 function matchScore(product, query) {
+  if (["орех", "орехи"].includes(query.trim().toLowerCase())) {
+    const words = qWords(product);
+    if (words.includes("орехите") && !words.some(w => w === "орех" || w === "орехи")) return -1;
+  }
   const pw = qWords(product);
   if (!pw.length) return -1;
   const qw = qWords(query).filter(w => w.length >= 3);
@@ -269,7 +408,9 @@ function matchScore(product, query) {
     const alts = altsFor(q);
     let found = -1;
     for (let i = 0; i < pw.length; i++) {
-      if (!alts.some(a => wordHit(pw[i], a))) continue;
+      const k = hitKind(pw[i], alts);
+      if (!k) continue;
+      if (k === 1 && !abbrevOk(product, alts, pw[i])) continue;
       if (single && i > 0 && MARKERS.has(pw[i-1])) continue;
       if (single && i > 1 && pw[i-1] === "на" && SCENT.has(pw[i-2])) continue;
       if (single && i > 3) continue;
@@ -291,26 +432,139 @@ const SRC_LABEL = { 1: "официална", 2: "от магазина" };
 const isFar = chain => S.nearOnly && S.geoKm
   && S.geoKm[chain] != null && S.geoKm[chain] > NEAR_RADIUS;
 
+/* ---------- какво точно е съвпаднало ----------
+   „Орехи“ намираше „ШПЕК КЛАСИК ОРЕХИТЕ“, защото „Орехите“ е МАРКА
+   колбаси. „Мед“ намираше „Медикс“. „Лук“ намираше „Лукчета Бронхо“ и
+   „Сапун Лукс“. „Кафе“ намираше кафеавтомат. Всичките са едно и също:
+   думата съвпада, стоката — не.
+
+   Лексикално не се разграничават: „орехите“ Е членувано множествено на
+   „орех“. Разграничава ги само СМИСЪЛЪТ, а него го дава AI етикетът.
+   Затова всяко попадение получава степен: */
+/* Хомоглифи. В етикетите на AI-я се срещат латински букви вътре в
+   кирилски думи: типът на „Прясно Мляко Верея“ е „прясно млякo 3%“ с
+   ЛАТИНСКО o. Без изравняване „мляко“ не съвпада с „млякo“ и 25 истински
+   млека изчезваха от търсенето. Изравняването важи и за двете страни,
+   значи транслитерацията („milka“) продължава да работи. */
+const CONFUSABLE = { a: "а", c: "с", e: "е", o: "о", p: "р", x: "х", y: "у",
+                     k: "к", m: "м", t: "т" };
+// Класът се строи от самата таблица. Написан на ръка, той вече веднъж
+// изпусна точно „o“ — буквата, заради която започна всичко.
+const CONFUSABLE_RE = new RegExp("[" + Object.keys(CONFUSABLE).join("") + "]", "g");
+const _foldCache = new Map();
+function fold(w) {
+  let v = _foldCache.get(w);
+  if (v !== undefined) return v;
+  v = w.replace(CONFUSABLE_RE, ch => CONFUSABLE[ch]);
+  if (_foldCache.size < 60000) _foldCache.set(w, v);
+  return v;
+}
+const NEAR_FORM = (w, q) =>
+  // същата дума в друго число или членувана: „домат“ ↔ „домати“
+  (w.startsWith(q) && w.length - q.length <= 2) ||
+  (q.startsWith(w) && q.length - w.length <= 2 && w.length >= 4);
+// същото правило като в hitKind, но за една двойка думи
+const SAME_START = (w, q) => w.startsWith(q) || (q.startsWith(w) && w.length >= 4);
+
+/* Думите на етикета се разчитат веднъж на ред и се помнят върху него —
+   labKey прави няколко операции над низ, а редовете са 28 000.
+   Кешът носи ВЕРСИЯ на етикетите: индексът за търсене и labels.json се
+   теглят паралелно, значи първото търсене може да е преди етикетите. Без
+   версията то запомняше „няма етикет“ завинаги и филтърът оставаше мъртъв
+   до презареждане на страницата. */
+let labelsVersion = 0;
+function labWords(it) {
+  if (it._lv !== labelsVersion) {
+    const l = labelFor(it.n);
+    it._tw = (l && l.t) ? qWords(l.t).map(fold) : null;
+    it._bw = (l && l.b) ? qWords(l.b).map(fold) : null;
+    it._lv = labelsVersion;
+  }
+  return it;
+}
+/*  3 — заявката е самата стока (дума от типа, в която и да е форма)
+    2 — друга дума със същото начало („кафеавтомат“ при „кафе“)
+    1 — само марката („Орехите“, „Медикс“)
+    0 — само в името: етикетът казва, че стоката е нещо друго
+   −1 — няма етикет или няма тип → не гадаем, пуска се */
+function tierOf(it, alts) {
+  labWords(it);
+  if (!it._tw) return -1;
+  if (it._tw.some(w => alts.some(a => NEAR_FORM(w, a)))) return 3;
+  if (it._tw.some(w => alts.some(a => SAME_START(w, a)))) return 2;
+  if (it._bw && it._bw.some(w => alts.some(a => SAME_START(w, a)))) return 1;
+  return 0;
+}
+
 function searchIn(items, query, limit = 80, near = false) {
   const seen = new Set();
-  return items
+  let rows = items
     .map(it => [it, matchScore(it.n, query)])
-    .filter(([it, sc]) => sc >= 0 && !(near && isFar(it.s)))
+    .filter(([it, sc]) => sc >= 0 && !S.hidden.has(it.s) && !(near && isFar(it.s)))
     .sort((a, b) => a[1] - b[1]
       || (a[0].u == null) - (b[0].u == null)
       || (a[0].u ?? a[0].p) - (b[0].u ?? b[0].p))
     .filter(([it]) => {
-      const k = it.s + "|" + it.n.toLowerCase();
+      const k = it.s + "|" + (it._l || it.n.toLowerCase());
       if (seen.has(k)) return false;
       seen.add(k); return true;
     })
-    .slice(0, limit)
     .map(([it]) => it);
+
+  /* Кое от двете е искал човекът — стока или марка — не се гадае, а се
+     чете от самите резултати:
+
+       „орехи“  → 34 съвпадат по ТИП, 18 само по марка → търси стока,
+                  значи шпекът „Орехите“ е шум и отпада;
+       „милка“  → 27 по тип, 183 само по марка → търси МАРКА, всичко остава.
+
+     Същото и за втория случай: щом мнозинството съвпадат с точната дума
+     („домат“ за „домати“), тези с друга дума от същото начало
+     („кафеавтомат“ за „кафе“) са шум.
+
+     Редовете без етикет (2% от каталога) никога не отпадат — при липса
+     на данни се пуска, не се гадае. */
+  const qw = qWords(query).filter(w => w.length >= 3);
+  if (S.labels && qw.length && rows.length) {
+    const alts = [...new Set(qw.flatMap(altsFor))].map(fold);
+    let tiers = rows.map(it => tierOf(it, alts));
+    /* Степента ПОДРЕЖДА, не само отсява. „K-Classic Орехи XXL“ (тип
+       „орехи“) стои след „ОРЕХИТЕ ШПЕК“ само защото марката е първата
+       дума в името. Подредбата по степен слага истинската стока отпред,
+       дори когато шумът не може да бъде махнат. */
+    const order = rows.map((it, i) => i)
+      .sort((a, b) => tiers[b] - tiers[a] || a - b);
+    rows = order.map(i => rows[i]);
+    tiers = order.map(i => tiers[i]);
+    const c = { "-1": 0, 0: 0, 1: 0, 2: 0, 3: 0 };
+    for (const t of tiers) c[t]++;
+    const inType = c[3] + c[2];
+    // Праг от 3: под него данните са твърде тънки, за да се решава.
+    const dropWord = c[3] >= 3;
+    const dropBrand = inType >= 3 && inType > c[1];
+    // За „само в името“ прагът е двоен. Етикетите не са безгрешни —
+    // „515Г ЛЮТЕН.ОЛИНЕЗА“ носи тип „лютеница“ и празна марка, тоест
+    // единственото място с думата „олинеза“ е името. При тесен превес
+    // такъв ред е по-вероятно да е верен, отколкото шум.
+    const dropName = c[3] >= 3 && c[3] > c[0] * 2;
+    if (dropWord || dropBrand || dropName) rows = rows.filter((_, i) =>
+      !(dropWord && tiers[i] === 2) &&
+      !(dropBrand && tiers[i] === 1) &&
+      !(dropName && tiers[i] === 0));
+  }
+  return rows.slice(0, limit);
 }
 
-function pricesEverywhere(items, query) {
+/* `keep` се прилага ПРЕДИ да се избере най-евтиното от всяка верига.
+   Иначе от „Кауфланд“ оставаше само спиртната напитка (най-евтината) и
+   цялата верига отпадаше, вместо да покаже плодовата напитка. */
+function pricesEverywhere(items, query, keep) {
   const per = {};
-  for (const h of searchIn(items, query, 300)) {
+  // Таванът е 2000, не 300: `keep` отсява НАД него, значи нисък таван
+  // режеше вериги още преди филтъра. Измерено — при 5% от продуктите се
+  // губеха вериги („Бебешко пюре телешки гулаш“: 12 вместо 16).
+  for (const h of searchIn(items, query, 2000)) {
+    if (keep && !keep(h)) continue;
     const k = h.s.toLowerCase();
     const v = h.u ?? h.p;
     if (!(k in per) || v < (per[k].u ?? per[k].p)) per[k] = h;
@@ -332,8 +586,488 @@ function tokenize(name) {
     .toLowerCase().split(/[^0-9a-zа-яё]+/).filter(Boolean);
 }
 const labKey = n => n.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 80);
+
+/* ---------- NameClean: разлепяне на счупени имена ----------
+   Огледало на NameClean.kt. Кауфланд строи името от съседни <span>-ове
+   без разделител и textContent ги слепва:
+     „Омарот нашата витринакг-20% отстъпка с“ = Омар | от нашата витрина |
+     кг | -20% отстъпка с
+   Скрейпърът вече го прави правилно, но старите записи във фийда остават
+   счупени до следващото пълно обхождане — затова се чисти и тук.
+   Внимание с хомоглифите: „Raid Eлектрически“ е с ЛАТИНСКО E вътре в
+   кирилска дума. Затова правилата искат по ДВА знака от всяка страна на
+   границата, иначе накъсват имената на срички. */
+const NC_TAIL = [
+  /\s*[-–—]?\s*\d{1,2}\s*%?\s*отстъпка(\s+с)?\s*$/i,
+  /\s*цена\s+с(\s+карта)?\s*$/i,
+  /\s*[-–—]\s*\d{1,2}\s*%\s*$/,
+  /\s*само\s+с\s+карта\s*$/i,
+];
+/* „Омар ОТ НАШАТА ВИТРИНА кг“ описва къде стои омарът, не какъв е — тези
+   фрази трябва да изчезнат, иначе сравнението хваща „нашата“ и вади хляб
+   до омара. Маха се цялата фраза С предлога: „Нашата Трапеза“ е марка. */
+const NC_MARKETING = [
+  /\s*от\s+(нашата|нашето|свежата|нашия|нашите)\s+\S+/ig,
+  /\s*от\s+витрината/ig,
+  /\s*от\s+(нашата\s+)?(пекарна|скара|кухня|месарница)/ig,
+  /\s*(само\s+)?в\s+магазините?\s+на\s+\S+/ig,
+];
+const NC_GLUED_PREP =
+  /([А-Яа-яЁё]{3,})от\s+(нашата|нашето|свежата|нашия|нашите|витрината)/ig;
+/* Гола единица най-накрая, без число пред нея: „Омар кг“ → „Омар“.
+   „Мляко 1 л“ остава — там числото носи смисъл. */
+const NC_TRAILING_UNIT = /(?<![\d,.])\s+(кг|гр\.|гр|г|мл|л|бр\.|бр)\s*$/i;
+const NC_CASE = /([a-zа-яё])([A-ZА-ЯЁ][a-zа-яё])/g;
+const NC_LAT_CYR = /([A-Za-z]{2})([А-Яа-яЁё]{2})/g;
+const NC_CYR_LAT = /([А-Яа-яЁё]{2})([A-Za-z]{2})/g;
+const NC_ALPHA_NUM = /([A-Za-zА-Яа-яЁё]{2})(\d)/g;
+const NC_NUM_ALPHA = /(\d)([A-Za-zА-Яа-яЁё]{2})/g;
+/* Думи, които веригите слагат в отделен <span> след името. Търсят се само
+   в края на дума и само ако отпред остава нещо смислено — за да не
+   разцепим „млекар“ на „мле“+„кар“. */
+const NC_GLUED_SUFFIX = [
+  "от нашата витрина", "от свежата витрина", "от витрината",
+  "от нашата пекарна", "от нашето месарство",
+  "отстъпка с", "отстъпка", "цена с карта", "цена с",
+  "кг", "гр", "мл", "бр", "литра", "литър", "опаковка", "пакет",
+  "различни видове", "различни сортове", "различни",
+];
+const NC_LETTER = /[A-Za-zА-Яа-яЁё]/;
+function ncSplitWord(w) {
+  if (w.length < 5) return w;
+  const lower = w.toLowerCase();
+  for (const suf of NC_GLUED_SUFFIX) {
+    const s = suf.replace(/ /g, "");
+    if (lower.length > s.length + 3 && lower.endsWith(s)) {
+      const head = w.slice(0, w.length - s.length);
+      if (head.length >= 4 && NC_LETTER.test(head)) return head + " " + suf;
+    }
+  }
+  return w;
+}
+function ncClean(raw) {
+  let s = raw.replace(/\s+/g, " ").trim();
+  s = s.replace(/\d+[.,]\d{2}\s*(?:€|EUR|лв\.?)/gi, " ").trim();
+  // 1. опашки — до три пъти, защото се трупат
+  for (let i = 0; i < 3; i++) {
+    const before = s;
+    for (const re of NC_TAIL) s = s.replace(re, "").trim();
+    if (s === before) break;
+  }
+  // 2. смяна на азбука / буква↔цифра, преди речника: така „витринакг-20%“
+  //    вече е загубило опашката си. В цикъл, защото едно минаване не хваща
+  //    верига от три слепени части.
+  for (let i = 0; i < 3; i++) {
+    const before = s;
+    s = s.replace(NC_CASE, "$1 $2").replace(NC_LAT_CYR, "$1 $2")
+         .replace(NC_CYR_LAT, "$1 $2").replace(NC_ALPHA_NUM, "$1 $2")
+         .replace(NC_NUM_ALPHA, "$1 $2");
+    if (s === before) break;
+  }
+  s = s.split(" ").map(ncSplitWord).join(" ");            // 3. речник
+  s = s.replace(NC_GLUED_PREP, "$1 от $2");               // 4. слепен предлог
+  for (const re of NC_MARKETING) s = s.replace(re, "");
+  s = s.replace(NC_TRAILING_UNIT, "");                    // 5. гола единица
+  return s.replace(/\s+/g, " ").trim()
+          .replace(/^[-–—·,\s]+/, "").replace(/[-–—·,\s]+$/, "");
+}
+const _ncCache = new Map();
+function nameClean(raw) {
+  if (!raw || !raw.trim()) return raw;
+  const hit = _ncCache.get(raw);
+  if (hit !== undefined) return hit;
+  let res = ncClean(raw);
+  // Предпазител: ако правилата са изяли смисъла, по-добре шумното
+  // оригинално име, отколкото празен ред.
+  if ((res.match(/[A-Za-zА-Яа-яЁё]/g) || []).length < 3)
+    res = raw.replace(/\s+/g, " ").trim();
+  if (_ncCache.size < 30000) _ncCache.set(raw, res);
+  return res;
+}
+
+/* ---------- Kinds: вид на стоката ВЪТРЕ в категорията ----------
+   Огледало на Kinds.kt. Категориите са широки кофи: „napit“ събира
+   минералната вода, кафето, виното и ракията. Заради това „Aspasia
+   Негазирана напитка“ вадеше „СП.НАПИТКА РАКИЯ ГРОЗДЕН“ — и двете са
+   „напитка“, и двете са в „napit“.
+   Правилото е нарочно ПЛАХО: изключваме само при доказан конфликт. */
+const K_OVERRIDE = [
+  ["bezalk", ["безалкохол", "0% alc", "0,0%", "alcohol free", "без алкохол",
+    "нискоалкохол"]],
+];
+const K_TABLE = [
+  ["alk", ["ракия", "водка ", "уиски", "whisky", "whiskey", "джин ", "gin ",
+    " ром ", "мастик", "ликьор", "liqueur", "узо ", "вермут", "коняк ",
+    "бренди", "brandy", "текила", "tequila", "абсент", "аперитив",
+    "спиртна", "спиртни", "гроздова", "мента ликьор", "бехеровка",
+    "вино ", "вина ", "винен", "винена", "wine ", "vino ",
+    "розе ", "rose ", "шампанско", "шампанск",
+    "пенливо", "пенлив", "prosecco", "просеко", "просек",
+    "мерло", "каберне", "шардоне", "совиньон", "мавруд", "траминер",
+    "мускат ", "ризлинг", "пино ", "малбек", "шираз ",
+    "бира ", "beer ", "пиво ", "лагер ", "ейл ", "стаут ", "сайдер", "cider",
+    "% vol", "алкохол"]],
+  ["kafe", ["кафе", "coffee", "нескафе", "nescafe", "капучино", "cappuccino",
+    "еспресо", "espresso", "latte", "мока ", "джезве",
+    "чай ", "tea ", "билков чай", "какао ", "cacao", "cocoa"]],
+  ["voda", ["минерална вода", "изворна вода", "трапезна вода", "вода 0",
+    "вода 1", "вода 5", "натурална вода", "газирана вода"]],
+  ["bezalk", ["сок ", "juice", "нектар ", "фреш ", "смути", "smoothie",
+    "кола ", "cola ", "фанта", "fanta", "спрайт", "sprite", "швепс",
+    "schweppes", "pepsi", "mirinda", "7-up", "лимонада", "лимонад",
+    "тоник ", "tonic", "енергийн", "energy", "студен чай", "ice tea",
+    "айран ", "безалкохолн", "негазиран", "газиран напитк", "комбуча",
+    "сироп ", "syrup", "малцова"]],
+  ["sirene", ["сирене ", "кашкавал ", "моцарела ", "пармезан ", "чедър",
+    "гауда", "ементал", "камембер", "извара ", "крема сирене", "фета "]],
+  ["kiselo", ["кисело мляко", "йогурт ", "yogurt", "айрян", "гръцко мляко",
+    "скир ", "кефир "]],
+  ["prqsno", ["прясно мляко", "пълномаслено мляко", "обезмаслено мляко",
+    "мляко 3", "мляко 2", "мляко 1", "uht"]],
+  ["maslo", ["масло ", "краве масло", "маргарин ", "сметана "]],
+  ["kolbas", ["салам ", "луканка", "суджук", "наденица", "кренвирш",
+    "пастет", "бекон ", "шунка ", "прошуто", "саздърма", "филе елена",
+    "колбас", "малотрайни", "трайни"]],
+  ["surovo", ["свинск", "телешк", "пилешк", "агнешк", "заешк", "патешк",
+    "пуешк", "кайма ", "разфасовк", "плешка", "котлет", "шницел",
+    "филе от", "гърди", "крилца", "бутчета"]],
+  ["riba", ["сьомга ", "риба ", "скумрия", "хек ", "ципура", "лаврак",
+    "пъстърва", "риба тон", "сардин", "херинга", "калмар", "скариди",
+    "миди ", "омар", "октопод", "хайвер", "аншоа"]],
+  ["hlqb", ["хляб ", "хлебче", "багета", "кифла", "козунак", "содена",
+    "тортила", "пита ", "питка"]],
+  ["sladko", ["шоколад ", "вафла", "бисквит", "бонбон", "торта ", "сладолед",
+    "десерт", "кроасан", "мъфин", "нуга", "халва", "локум", "конфитюр"]],
+  ["soleno", ["чипс ", "солети", "фъстъци", "ядки", "бадем ", "кашу ",
+    "шамфъстък", "пуканки", "крекер"]],
+  ["pochist", ["препарат ", "белина ", "омекотител", "прах за пране",
+    "гел за пране", "таблетки за съдомиялн", "сол за съдомиялн",
+    "почистващ", "дезинфект", "обезмаслител"]],
+  ["kozmet", ["шампоан ", "балсам ", "душ гел", "сапун ", "паста за зъби",
+    "дезодорант", "крем за", "лосион ", "маска за коса", "боя за коса",
+    "самобръсначк", "четка за зъби", "тоалетна хартия", "пелени ",
+    "дамски превръзк", "мокри кърпи"]],
+];
+const K_ALNUM = /[\p{L}\p{N}]/u;
+/* Съвпадение САМО в началото на дума. Без това „кашкавал“ съдържа „кава“
+   и става алкохол, „шоколад“ съдържа „кола“, „салата Тракия“ съдържа
+   „ракия“, а „зехтин върджин“ — „джин“. При 28 000 имена това са стотици
+   грешни класификации.
+   БЕЗ trim: интервалите в списъците са нарочни — „ ром “ иска цяла дума,
+   иначе „Ромашка чай“ става алкохол. */
+function kHasWord(hay, needle) {
+  if (!needle) return false;
+  let i = hay.indexOf(needle);
+  while (i >= 0) {
+    if (i === 0 || !K_ALNUM.test(hay[i - 1])) return true;
+    i = hay.indexOf(needle, i + 1);
+  }
+  return false;
+}
+const _kCache = new Map();
+function kindOf(name) {
+  if (!name || !name.trim()) return "";
+  const hit = _kCache.get(name);
+  if (hit !== undefined) return hit;
+  const lower = " " + name.toLowerCase() + " ";
+  let res = "";
+  // Отменящите думи имат предимство: „безалкохолна бира“ е bezalk,
+  // въпреки че съдържа и „бира“, и „алкохол“.
+  for (const [kind, words] of K_OVERRIDE)
+    if (words.some(w => kHasWord(lower, w))) { res = kind; break; }
+  if (!res) for (const [kind, words] of K_TABLE)
+    if (words.some(w => kHasWord(lower, w))) { res = kind; break; }
+  if (_kCache.size < 30000) _kCache.set(name, res);
+  return res;
+}
+/* Етикетът от AI: категория, марка, тип, каноничен продукт, алкохол. */
+const labelFor = n => {
+  const label = (S.labels ? S.labels[labKey(n)] : null) || null;
+  const words = n.toLowerCase().split(/[^а-я]+/);
+  const walnut = words.filter(Boolean).slice(0,3).some(w => w === "орех" || w === "орехи") &&
+    !words.some(w => /^(шпек|салам|суджук|шоколад|бисквит|хляб|торт|сладк)/.test(w) || w === "орехите" || w === "с");
+  return walnut ? { ...(label || {}), c: "bakal", t: "орехи", b: "" } : label;
+};
+/* Полето `t` — какво е това според AI. По-надеждно от гадаене по думи,
+   защото моделът е видял цялото име, включително счупеното. */
+const typeOf = n => { const l = labelFor(n); return l && l.t ? l.t.trim() : ""; };
+/* Първо AI етикетът (промпт v2) — той не се лъже от „Салата Тракия“.
+   Правилата отдолу поемат старите етикети и имената без етикет. */
+function isAlcohol(name) {
+  const l = labelFor(name);
+  if (l && (l.v || 1) >= 2) return l.a === 1;
+  return kindOf(name) === "alk";
+}
+/* false само при ДОКАЗАН конфликт: двата вида са разпознати и различни.
+   Алкохол срещу безалкохолно е несъвместимо винаги — това беше най-
+   грубата грешка. */
+function kCompatible(a, b) {
+  if (isAlcohol(a) !== isAlcohol(b)) return false;
+  const ka = kindOf(a);
+  if (!ka) return true;
+  const kb = kindOf(b);
+  if (!kb) return true;
+  return ka === kb;
+}
+
+/* ---------- Икони по вид на стоката ----------
+   Снимка има за 1 120 продукта. Останалите 27 000 идват от официалните
+   данни на КЗП, които са ценоразписи — снимки там няма и няма да има.
+   Затова обликът на продукта се РИСУВА, а не се тегли.
+
+   Откъде се познава какво е: полето `t` от AI етикета, попълнено за
+   98,7% от каталога. Водещата му дума („паста“, „вино“, „шампоан“) е
+   ключът в таблицата отдолу. Топ 260 такива думи покриват 88% от
+   каталога; каквото остане, пада към иконата на категорията, тъй че гол
+   ред няма.
+
+   Защо рисувани, а не емоджи: емоджито се изчертава от системата и е
+   различно на Windows, Android и iPhone. Тези тук са едни и същи
+   навсякъде, нула байта мрежа, оцветяват се по категория и работят
+   офлайн.
+
+   Формата е обща нарочно — всички вина са бутилка, всички шампоани са
+   помпа. На 60 пиксела силуетът се чете, детайлът — не. */
+const GLYPH = {
+  bottle: '<path d="M10 2.5h4v3.6c0 .5.2 1 .5 1.4l1.6 2.2c.4.5.6 1.2.6 1.9v9.4a1 1 0 0 1-1 1H8.3a1 1 0 0 1-1-1v-9.4c0-.7.2-1.4.6-1.9l1.6-2.2c.3-.4.5-.9.5-1.4V2.5z"/><path d="M7.3 13.5h9.4"/>',
+  beer: '<path d="M6 7.5h9v12.6a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7.5z"/><path d="M15 10.5h2.3a2.4 2.4 0 0 1 0 4.8H15"/><path d="M6 7.5c0-1.7 1.3-3.1 3-3.1h3c1.7 0 3 1.4 3 3.1"/><path d="M9 11.5v5.5M12 11.5v5.5"/>',
+  milk: '<path d="M8.5 8.4 12 3l3.5 5.4v12.7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V8.4z"/><path d="M8.5 8.4h7M9.8 13.5h4.4"/>',
+  yogurt: '<path d="M6.6 9.2h10.8l-1.2 11.1a1 1 0 0 1-1 .9H8.8a1 1 0 0 1-1-.9L6.6 9.2z"/><path d="M5.4 9.2h13.2V6.8H5.4z"/><path d="M9.6 13.5h4.8"/>',
+  cheese: '<path d="M3 15.4 12.6 7.8H21v7.6H3z"/><path d="M3 15.4v3.4h18v-3.4"/><circle cx="8.4" cy="12.4" r="1.1"/><circle cx="14.2" cy="12.9" r="1.4"/>',
+  butter: '<path d="M4 9.6h12.6v10.2H4z"/><path d="M4 9.6 6.8 6.8h12.6L16.6 9.6M16.6 9.6l2.8-2.8v10.2l-2.8 2.6"/>',
+  sausage: '<path d="M4.4 15.4C4.4 9.5 9.5 4.4 15.4 4.4c2.3 0 4.2 1.9 4.2 4.2 0 5.9-5.1 11-11 11-2.3 0-4.2-1.9-4.2-4.2z"/><circle cx="10" cy="14" r=".9"/><circle cx="13.6" cy="10.4" r=".9"/>',
+  meat: '<path d="M13.8 4.2a5.2 5.2 0 0 1 6.4 6.4c-.6 2.1-2.5 3.5-4.6 3.6l-1.7.1-3.7 3.7a3.3 3.3 0 1 1-3-3l3.7-3.7.1-1.7c.1-2.1 1.5-4 3.6-4.6z"/><path d="M8.4 15.6 3.6 20.4"/>',
+  fish: '<path d="M19.6 12c-2.3 3.1-5.4 4.9-8.8 4.9S5.9 15.1 4.7 12C5.9 8.9 8.5 7.1 10.8 7.1s6.5 1.8 8.8 4.9z"/><path d="M4.7 12 2 8.7v6.6L4.7 12z"/><circle cx="15" cy="10.6" r=".9"/>',
+  bread: '<path d="M4 11.2c0-3.4 3.6-5.2 8-5.2s8 1.8 8 5.2v6.8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6.8z"/><path d="M8.2 8.6v10.4M12 7v12M15.8 8.6v10.4"/>',
+  croissant: '<path d="M20.4 8.6C20.4 14.5 15.6 19.3 9.7 19.3c-2.5 0-4.8-.8-6.6-2.3 1.2.5 2.4.7 3.7.7 5.2 0 9.4-4.2 9.4-9.4 0-1.3-.3-2.5-.8-3.6 1.9.9 3.5 2.2 5 3.9z"/>',
+  pasta: '<path d="M4 7.4c2.3 1.7 3.3 1.7 5.3 0s3.4-1.7 5.4 0 3 1.7 5.3 0M4 12c2.3 1.7 3.3 1.7 5.3 0s3.4-1.7 5.4 0 3 1.7 5.3 0M4 16.6c2.3 1.7 3.3 1.7 5.3 0s3.4-1.7 5.4 0 3 1.7 5.3 0"/>',
+  sack: '<path d="M8.2 6.4h7.6l1.4 12.4a2 2 0 0 1-2 2.2H8.8a2 2 0 0 1-2-2.2L8.2 6.4z"/><path d="M8.2 6.4c0-1.6 1.1-3 3.8-3s3.8 1.4 3.8 3"/><path d="M9.6 12.6h4.8"/>',
+  jar: '<path d="M6.6 9.4h10.8v10.6a2 2 0 0 1-2 2H8.6a2 2 0 0 1-2-2V9.4z"/><path d="M6.6 9.4V7.2a1 1 0 0 1 1-1h8.8a1 1 0 0 1 1 1v2.2"/><path d="M8.4 13.4h7.2"/>',
+  oil: '<path d="M10 3h4v3.2l1.9 2.6c.4.5.6 1.2.6 1.9v9.4a1.9 1.9 0 0 1-1.9 1.9H9.4a1.9 1.9 0 0 1-1.9-1.9v-9.4c0-.7.2-1.4.6-1.9L10 6.2V3z"/><path d="M12 13.4c1 1.1 1.5 1.9 1.5 2.6a1.5 1.5 0 0 1-3 0c0-.7.5-1.5 1.5-2.6z"/>',
+  egg: '<path d="M12 3c3.3 0 6 4.4 6 8.6S15.3 21 12 21s-6-5.2-6-9.4S8.7 3 12 3z"/>',
+  veg: '<path d="M12 6.6c4.1 0 7.4 3.2 7.4 7.2S16.1 21 12 21s-7.4-3.2-7.4-7.2S7.9 6.6 12 6.6z"/><path d="M12 6.6V4.4"/><path d="M12 4.4c-1.6 0-2.6-.8-3.1-2.1 1.6-.3 2.6.3 3.1 2.1.5-1.8 1.5-2.4 3.1-2.1-.5 1.3-1.5 2.1-3.1 2.1z"/>',
+  fruit: '<path d="M12 7.6c1.4-1.3 3-1.8 4.4-1.2 2 .9 3.1 3.5 2.4 6.6-.7 3.1-3 6.8-5.2 6.8-.8 0-1.1-.4-1.6-.4s-.8.4-1.6.4c-2.2 0-4.5-3.7-5.2-6.8-.7-3.1.4-5.7 2.4-6.6 1.4-.6 3-.1 4.4 1.2z"/><path d="M12 7.6V4.4"/><path d="M12 4.4c1.8-.5 3-.2 3.6 1-1.8.5-3 .2-3.6-1z"/>',
+  choco: '<path d="M5 5.2h14v13.6H5z"/><path d="M5 9.7h14M5 14.3h14M9.7 5.2v13.6M14.3 5.2v13.6"/>',
+  cookie: '<circle cx="12" cy="12" r="8.5"/><circle cx="9.4" cy="9.6" r="1"/><circle cx="14.2" cy="11.2" r="1"/><circle cx="10.8" cy="14.6" r="1"/>',
+  icecream: '<path d="M8 10.2h8l-3.1 10.3a.9.9 0 0 1-1.8 0L8 10.2z"/><path d="M12 3.4a4.6 4.6 0 0 1 4.6 4.6c0 .8-.2 1.6-.6 2.2H8c-.4-.6-.6-1.4-.6-2.2A4.6 4.6 0 0 1 12 3.4z"/>',
+  coffee: '<path d="M5 7.6h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5v-6z"/><path d="M16 10h1.6a2.5 2.5 0 0 1 0 5H16"/><path d="M4 21.2h13.4"/><path d="M8.4 2.6c-.7 1-.1 1.8.5 2.6M12 2.6c-.7 1-.1 1.8.5 2.6"/>',
+  tea: '<path d="M5.6 18.6c0-6.3 4.7-11.5 12.6-12.6.5 6.9-4.2 12.6-12.6 12.6z"/><path d="M5.6 18.6c2.1-3.2 4.7-5.6 7.9-7.2"/>',
+  water: '<path d="M10.4 2.6h3.2v2h.6a1 1 0 0 1 1 1v1.6c0 .5.1 1 .4 1.4l.6.9c.3.4.4.9.4 1.4v9.2a2 2 0 0 1-2 2H9.4a2 2 0 0 1-2-2v-9.2c0-.5.1-1 .4-1.4l.6-.9c.3-.4.4-.9.4-1.4V5.6a1 1 0 0 1 1-1h.6v-2z"/><path d="M8 13.4h8"/>',
+  juice: '<path d="M6.4 4.4h11.2l-1.4 15.8a2 2 0 0 1-2 1.8H9.8a2 2 0 0 1-2-1.8L6.4 4.4z"/><path d="M7 10.4h10"/><path d="M14.6 2.4 12.6 9"/>',
+  cigs: '<path d="M5 9.4h14v11.8H5z"/><path d="M5 9.4 6.6 4h10.8L19 9.4"/><path d="M5 13.4h14M9.7 13.4v7.8M14.3 13.4v7.8"/>',
+  tube: '<path d="M8 7.6h8v13.4a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7.6z"/><path d="M9 7.6 10 4.6h4l1 3"/><path d="M10.6 4.6V2.4h2.8v2.2"/><path d="M8 11.4h8"/>',
+  brush: '<path d="m4.6 17.6 8.2-8.2"/><path d="M12.4 6.8c1-1 2.7-1 3.7 0l1.1 1.1c1 1 1 2.7 0 3.7l-1 1-4.8-4.8 1-1z"/><path d="m3 19.4 1.9-1.9 2 2-1.9 1.9z"/><path d="M17.8 5v-2M19.8 6.6v-2M21.2 8.6v-2"/>',
+  pump: '<path d="M8 9.6h8a1 1 0 0 1 1 1v10.4a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V10.6a1 1 0 0 1 1-1z"/><path d="M10.2 9.6V6.8h3.6v2.8"/><path d="M11.2 6.8V4.2h4c1 0 1.6.7 1.6 1.6v1.4"/><path d="M7.4 13.6h9.2"/>',
+  soap: '<path d="M4 12a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5.6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V12z"/><circle cx="8" cy="6.4" r="1.3"/><circle cx="12.8" cy="4.6" r="2.1"/>',
+  cream: '<path d="M5.4 10.4h13.2v8.6a2 2 0 0 1-2 2H7.4a2 2 0 0 1-2-2v-8.6z"/><path d="M4.2 7.8h15.6v2.6H4.2z"/><path d="M8.4 7.8V5.2h7.2v2.6"/>',
+  spray: '<path d="M9 9.4h6a1 1 0 0 1 1 1v10.6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10.4a1 1 0 0 1 1-1z"/><path d="M10.2 9.4V5.6h3.6v3.8"/><path d="M13.8 5.6h3.4"/><path d="M18.6 3.6v1M20.4 5v1M18.6 7.4v1M21 9.2h1"/>',
+  lipstick: '<path d="M9 10.4h6v10.6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V10.4z"/><path d="M9.6 10.4V7.8c0-.6.4-1 1-1h2.8c.6 0 1 .4 1 1v2.6"/><path d="M10.6 6.8V4.2l2.8-1.8v4.4"/>',
+  pencil: '<path d="m6 20.2 1-4.2 9-9 3.2 3.2-9 9-4.2 1z"/><path d="m15 5.2 3.2 3.2 1.6-1.6a2.3 2.3 0 0 0-3.2-3.2L15 5.2z"/>',
+  sun: '<circle cx="12" cy="12" r="4.6"/><path d="M12 2.6v2.4M12 19v2.4M21.4 12H19M5 12H2.6M18.6 5.4 17 7M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4"/>',
+  clean: '<path d="M8 8.4h8a1 1 0 0 1 1 1v11.6a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V9.4a1 1 0 0 1 1-1z"/><path d="M10 8.4v-3h4v3"/><path d="M10.6 5.4V3h2.8v2.4"/><path d="M9 12.6h6v4H9z"/>',
+  roll: '<path d="M4 8.6C4 6 5.8 4 8 4s4 2 4 4.6v9.8c0 1.4-1 2.6-2.2 2.6H6.2C5 21 4 19.8 4 18.4V8.6z"/><path d="M12 4h4.8c2.2 0 4 2 4 4.6v9.8c0 1.4-1 2.6-2.2 2.6h-3"/><path d="M8 4C6.9 4 6 6 6 8.6s.9 4.6 2 4.6 2-2 2-4.6S9.1 4 8 4z"/>',
+  wipes: '<path d="M4 8.6h16a1 1 0 0 1 1 1v10.4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.6a1 1 0 0 1 1-1z"/><path d="M4 8.6 5.2 4.9A2 2 0 0 1 7.1 3.4h9.8a2 2 0 0 1 1.9 1.5L20 8.6"/><path d="M9 12.4c1.6-1.1 4.4-1.1 6 0"/>',
+  diaper: '<path d="M4 6.4h16v3.8c0 5.6-3.6 10.2-8 10.2S4 15.8 4 10.2V6.4z"/><path d="M4 9.4c2.7 1.4 5.3 1.4 8 0 2.7 1.4 5.3 1.4 8 0"/>',
+  baby: '<path d="M9 9.4h6v10.2a3 3 0 0 1-6 0V9.4z"/><path d="M9.6 9.4V7h4.8v2.4"/><path d="M11 7V5.4a1 1 0 0 1 2 0V7"/><path d="M9 13.4h6"/>',
+  pill: '<path d="M6.4 6.4a5.2 5.2 0 0 1 7.4 0l3.8 3.8a5.2 5.2 0 0 1-7.4 7.4l-3.8-3.8a5.2 5.2 0 0 1 0-7.4z"/><path d="m9 9 6 6"/>',
+  pan: '<path d="M3 11.4h13a1 1 0 0 1 1 1v1.8a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5v-1.8a1 1 0 0 1 1-1z"/><path d="M17 12.8h4.4"/>',
+  battery: '<path d="M3 8.6h14.4a1 1 0 0 1 1 1v5.8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9.6a1 1 0 0 1 1-1z"/><path d="M20 10.8h1.6v3.4H20"/><path d="M5.4 11h5"/>',
+  box: '<path d="M3.6 7.6 12 3l8.4 4.6v8.8L12 21l-8.4-4.6V7.6z"/><path d="m3.6 7.6 8.4 4.6 8.4-4.6M12 12.2V21"/>',
+  shirt: '<path d="M8.6 3.4 4 5.8l1.6 4.4 2.2-.8v10.2c0 .6.4 1 1 1h6.4c.6 0 1-.4 1-1V9.4l2.2.8L20 5.8l-4.6-2.4a3.4 3.4 0 0 1-6.8 0z"/>',
+  paw: '<circle cx="7" cy="8.4" r="2.1"/><circle cx="12" cy="6.4" r="2.1"/><circle cx="17" cy="8.4" r="2.1"/><path d="M12 11.4c3 0 5.4 2.3 5.4 5.1 0 2.2-1.6 3.5-3.4 3.5-.9 0-1.4-.4-2-.4s-1.1.4-2 .4c-1.8 0-3.4-1.3-3.4-3.5 0-2.8 2.4-5.1 5.4-5.1z"/>',
+};
+
+/* Кой вид коя форма ползва. Ключът е ВОДЕЩАТА дума на типа от AI.
+   Списъкът е съставен от истинския фийд — топ 260 думи по честота, не
+   по въображение. Формите се повтарят нарочно: всички вина са бутилка. */
+const ICON_FOR = {};
+const bindIcons = (glyph, words) => words.forEach(w => { ICON_FOR[w] = glyph; });
+// Цветовете НЕ са в този списък. „Червено“ е и вино, и грозде, и месо —
+// затова минава през ICON_REFINE и се решава по целия текст.
+bindIcons("bottle", ["вино","винен","ракия","гроздова","сливова","мерло","merlot","каберне",
+  "шардоне","совиньон","мавруд","mavrud","траминер","мускат","розе","македонска","дебърцини",
+  "камчия","водка","уиски","джин","ликьор","коняк","бренди","текила","вермут","узо","мастика",
+  "спиртна","шампанско","пенливо","просеко"]);
+bindIcons("beer", ["бира","пиво","лагер","ейл","сайдер"]);
+bindIcons("milk", ["прясно","мляко","млечен","краве","крави","обезмаслено","пълномаслено","uht","сметана"]);
+bindIcons("yogurt", ["кисело","йогурт","каша","млечна","безмлечна","зърнена","айран","айрян","кефир","скир","десерт","пудинг"]);
+bindIcons("cheese", ["кашкавал","сирене","сир","сира","извара","моцарела","пармезан","чедър","гауда","фета","катък","крема"]);
+bindIcons("butter", ["масло","маслен","маргарин"]);
+bindIcons("sausage", ["шпек","колбас","салам","суджук","луканка","луканика","наденица","кренвирш",
+  "кренвирши","мортадела","гюбек","деликатесен","месна","хамбургски","пастет","шунка","бекон",
+  "прошуто","саздърма","карначе","малотрайни","трайни","обвивки","чичовци"]);
+bindIcons("meat", ["свинско","свинска","свински","пилешко","пилешки","пиле","телешко","телешки",
+  "агнешко","пуешко","заешко","кайма","мляно","месо","филе","разфасовка","котлет","шницел",
+  "гърди","крилца","бутчета","плешка","врат","ребра"]);
+bindIcons("fish", ["риба","скумрия","пъстърва","ципура","лаврак","толстолоб","сьомга","хек",
+  "сардина","херинга","калмар","скариди","миди","омар","октопод","хайвер","аншоа","сурови","цаца",
+  "попче","сафрид","кефал","барбун","паламуд","каракуда","мерлуза","тон","суши","тарама"]);
+bindIcons("bread", ["хляб","хлеб","питка","питки","земел","чабата","содена"]);
+bindIcons("croissant", ["кроасан","кроасани","krosaan","баница","баничка","банички","брускети",
+  "кифла","козунак","мъфин","геврек","брецел","щрудел","точени","кори","тесто","поничка","еклер"]);
+bindIcons("pasta", ["макарони","макаронни","спагети","талиатели","фусили","лапша","фиде","нудъл",
+  "тортелини","равиоли","лазаня","фарфале","лингуини","ригатони","кус","юфка"]);
+bindIcons("sack", ["брашно","захар","сол","ориз","оризов","леща","боб","грах","нахут","булгур",
+  "киноа","фасул","мая","бакпулвер","чия"]);
+bindIcons("jar", ["лютеница","маслини","компот","консервиран","зеленчуково","супа","корнишон",
+  "туршия","конфитюр","мармалад","мед","кетчуп","майонеза","горчица","песто","хумус","тарама","сос"]);
+bindIcons("oil", ["олио","зехтин","слънчогледово","маслиново","оцет","екстра"]);
+bindIcons("egg", ["яйца","яйце"]);
+bindIcons("veg", ["домати","краставици","краставица","зеле","лук","кромид","моркови","морков",
+  "картофи","картоф","гъби","чесън","тиквички","патладжан","чушки","пиперки","марули","спанак",
+  "броколи","карфиол","цвекло","репички","целина","салата","магданоз","копър","зеленчуци",
+  // Саксийните цветя нямат нищо общо с дрехите, а попадаха там по категория
+  "хризантема","роза","орхидея","бегония","фикус","лавандула","антуриум","каланхое",
+  "бромелия","сентполия","мушкато","цвете","букет"]);
+bindIcons("fruit", ["ябълки","ябълка","ябълков","банани","банан","портокали","портокал","лимони",
+  "лимон","плодово","плодов","плодова","грозде","дини","пъпеш","круши","праскови","кайсии",
+  "сливи","череши","ягоди","малини","боровинки","киви","ананас","авокадо","манго","смокини","фурми"]);
+bindIcons("choco", ["шоколад","shokolad","бонбони","бонбон","chocpizza","вафла","вафли","нуга",
+  "халва","тахан","локум","шогети"]);
+bindIcons("cookie", ["бисквити","бисквита","крекер","обикновени","солети","гризини","бишкоти",
+  "курабийки","меденки","кекс","торта","чийзкейк"]);
+bindIcons("icecream", ["сладолед","джелато"]);
+bindIcons("coffee", ["кафе","кофе","нескафе","капучино","еспресо","мока","джезве","какао"]);
+bindIcons("tea", ["чай","билков","зелен","подправки","чубрица","канела","ванилия","риган","дафинов"]);
+bindIcons("water", ["минерална","изворна","трапезна","вода","газирана","негазирана"]);
+bindIcons("juice", ["сок","напитка","нектар","фреш","смути","лимонада","тоник","сироп","коктейл","комбуча"]);
+bindIcons("cigs", ["цигари","цигарети","тютюн","пурети","пури"]);
+bindIcons("tube", ["паста","типов"]);
+bindIcons("brush", ["четка","електрическа","конец"]);
+bindIcons("pump", ["шампоан","shampoan","балсам","хидробалсам","шампоан-балсам","душ","гел",
+  "измиващ","пяна","течен","хидратиращ","кондиционер"]);
+bindIcons("soap", ["сапун","твърд","луга"]);
+bindIcons("cream", ["крем","лосион","серум","маска","околоочен","дневен","нощен","пилинг","база",
+  "формула","хранителна","естествен","мляко-демакиант","мицеларна"]);
+bindIcons("spray", ["спрей","дезодорант","део","рол-он","антиперспирант","антибактериални",
+  "течност","освежител","ароматизатор","парфюм","лак"]);
+bindIcons("lipstick", ["червило","гланц","руж","фон","коректор","сенки","палитра","компактна",
+  "боя","бронзант","хайлайтър","праймер"]);
+bindIcons("pencil", ["спирала","молив","очна","изкуствени","тетрадка","химикал"]);
+bindIcons("sun", ["слънцезащитен","слънцезащитно","слънчеви","spf"]);
+bindIcons("clean", ["препарат","веро","медикс","еко","белина","хлор","омекотител","перилен",
+  "прах","почистващ","дезинфект","обезмаслител","съдомиялна","стъклочистач"]);
+bindIcons("roll", ["тоалетна","хартия","кухненска","салфетки","салфетка"]);
+bindIcons("wipes", ["мокри","влажни","mokri","кърпи","кърпички","козметични"]);
+bindIcons("diaper", ["пелени","пелена","гащички","тампони","дамски","превръзки"]);
+bindIcons("baby", ["бебешко","бебешки","бебешка","детска","детски","пюре","залъгалка","биберон",
+  "адаптирано","био","мини"]);
+bindIcons("pill", ["таблетки","капсули","спирт","витамин","витамини","хомеопатичен","сироп-лекарство"]);
+bindIcons("pan", ["тиган","тенджера","чаша","чаши","термочаша","чиния","купа","прибори","нож",
+  "тава","касерола","гевгир","ренде","черпак","лъжица","вилица","комплект","сервиз"]);
+bindIcons("battery", ["батерии","батерия","зарядно","крушка","лампа","разклонител","удължител","уред","апарат"]);
+bindIcons("shirt", ["тениска","блуза","панталон","чорапи","бельо","пижама","халат","хавлиена",
+  "чаршаф","калъфка","одеяло","възглавница","обувки","джапанки"]);
+// Ключът се търси ПО ЕДНА ДУМА, значи „храна за кучета“ никога не се
+// улучва. Затова тук стоят самите думи, а комбинациите — в REFINE.
+bindIcons("paw", ["котешка","кучешки","кучешка","котешки","лакомство",
+  "whiskas","pedigree","friskies","purina","felix","darling","papion"]);
+
+/* Резервата по категория — за 12-те процента без разпознат вид. */
+const CAT_ICON = { plod:"fruit", meso:"meat", mlek:"milk", hlyab:"bread", bakal:"jar",
+  napit:"juice", sladko:"choco", zamr:"icecream", higi:"cream", dom:"clean", teh:"pan",
+  dreh:"shirt", pet:"paw", bebe:"baby", tut:"cigs", drugo:"box" };
+/* Цветът на плочката идва от категорията. Прозрачен процент, не плътен
+   цвят — така една стойност работи и в тъмна, и в светла тема. */
+const CAT_INK = { plod:"#57A80F", meso:"#D85A30", mlek:"#3789DD", hlyab:"#C98418",
+  bakal:"#B07D2B", napit:"#1D9E75", sladko:"#D4537E", zamr:"#4FB3D9", higi:"#8B7BE8",
+  dom:"#2AA5A0", teh:"#8C8B84", dreh:"#A695F2", pet:"#C98418", bebe:"#E08AAE",
+  tut:"#8C8B84", drugo:"#8C8B84" };
+
+/* Двусмислените думи. „Масло“ е и краве масло, и олио, и масло за нокти;
+   „гел“ е и душ гел, и гел за съдове; „вода“ е и минерална, и вода за
+   уста. Водещата дума не стига — гледа се целият тип.
+   Проверено срещу фийда: „паста“ например НЕ е двусмислена на практика —
+   1 578 от 2 215 са паста за зъби, така че тя си остава туба. */
+const ICON_REFINE = {
+  "масло": [["краве", "butter"], ["олио", "oil"], ["зехтин", "oil"],
+            ["нокти", "cream"], ["крака", "cream"], ["грим", "cream"], ["коса", "pump"]],
+  "гел": [["съдове", "clean"], ["пране", "clean"], ["тоалетн", "clean"],
+          ["болка", "pill"], ["вежди", "pencil"], ["нокти", "pencil"]],
+  "вода": [["уста", "tube"], ["лице", "cream"], ["тоалетна вода", "spray"]],
+  "мляко": [["кърмач", "baby"], ["малки деца", "baby"], ["кисело", "yogurt"],
+            ["демакиант", "cream"], ["за тяло", "cream"]],
+  "филе": [["рибн", "fish"], ["скумр", "fish"], ["сьомг", "fish"]],
+  "напитка": [["винен", "bottle"], ["алкохол", "bottle"], ["спиртн", "bottle"]],
+  "сол": [["съдомиял", "clean"]],
+  "крем": [["сапун", "soap"], ["чийзкейк", "cookie"], ["пита", "cookie"], ["торта", "cookie"]],
+  "паста": [["спагет", "pasta"], ["макарон", "pasta"]],
+  "кори": [["лазан", "pasta"]],
+  "маска": [["коса", "pump"]],
+  // Цветовете: сами по себе си не значат нищо. „Червено вино“ е бутилка,
+  // „червено грозде“ е плод, „червено месо“ е месо.
+  "червено": [["вино", "bottle"], ["грозде", "fruit"], ["месо", "meat"], ["зеле", "veg"]],
+  "червен": [["вино", "bottle"], ["пипер", "tea"], ["лук", "veg"]],
+  "бяло": [["вино", "bottle"], ["грозде", "fruit"], ["сирене", "cheese"], ["месо", "meat"]],
+  "бял": [["вино", "bottle"], ["боб", "sack"], ["ориз", "sack"], ["шоколад", "choco"]],
+  "розово": [["вино", "bottle"]],
+  "зелен": [["чай", "tea"], ["фасул", "veg"], ["грах", "veg"], ["маслини", "jar"]],
+  "прясно": [["мляко", "milk"]],
+  "млечна": [["напитка", "milk"], ["каша", "yogurt"], ["шоколад", "choco"]],
+  "млечен": [["шоколад", "choco"], ["десерт", "yogurt"]],
+  "таблетки": [["съдомиял", "clean"], ["пран", "clean"]],
+  "боя": [["коса", "pump"]],
+  "плодово": [["мляко", "yogurt"], ["желе", "choco"]],
+  // „храна“ сама по себе си е ядене; „храна за кучета“ е нещо друго.
+  "храна": [["куче", "paw"], ["котк", "paw"], ["коте", "paw"], ["домашни любимци", "paw"]],
+  "суха": [["куче", "paw"], ["котк", "paw"]],
+};
+
+/* Иконата на един продукт: типът от AI, после категорията. */
+const _icoCache = new Map();
+function iconOf(name) {
+  const hit = _icoCache.get(name);
+  if (hit) return hit;
+  const cat = catOf(name);
+  // Типът от AI, когато го има (98,7%), иначе самото име. И в двата
+  // случая се търси едно и също — така имената без етикет не минават по
+  // друг, по-глупав път.
+  const t = typeOf(name).toLowerCase();
+  const words = t ? t.split(" ") : tokenize(name);
+  const probe = t || name.toLowerCase();
+  let g = null;
+  // 1. Двусмислените думи, гледани спрямо ЦЕЛИЯ низ и на която и позиция
+  //    да стоят: „краве масло“ е масло, макар водещата дума да е „краве“.
+  for (const w of words) {
+    const ref = ICON_REFINE[w];
+    if (!ref) continue;
+    for (const [mark, glyph] of ref) if (probe.includes(mark)) { g = glyph; break; }
+    if (g) break;
+  }
+  // 2. Иначе първата дума, за която изобщо има форма.
+  if (!g) for (const w of words) if (ICON_FOR[w]) { g = ICON_FOR[w]; break; }
+  // Алкохолът винаги е бутилка, каквото и да е казал типът. Полето `a` от
+  // AI-я е по-надеждно от думите и вече го ползваме на други места.
+  if ((g === "juice" || g === "water" || !g) && isAlcohol(name)) g = "bottle";
+  const res = { g: GLYPH[g || CAT_ICON[cat] || "box"], c: CAT_INK[cat] || CAT_INK.drugo };
+  if (_icoCache.size < 40000) _icoCache.set(name, res);
+  return res;
+}
+/* Плочката: истинската снимка, ако я има, иначе рисуваната икона. */
+function thumb(name, img, px) {
+  const url = safeUrl(img);
+  if (url) return `<img class="th" loading="lazy" src="${esc(url)}" alt=""
+    referrerpolicy="no-referrer" style="width:${px}px;height:${px}px">`;
+  const { g, c } = iconOf(name);
+  return `<span class="th ico" style="width:${px}px;height:${px}px;--ic:${c}">
+    <svg viewBox="0 0 24 24" width="${Math.round(px * 0.54)}" height="${Math.round(px * 0.54)}"
+      fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"
+      stroke-linejoin="round" aria-hidden="true">${g}</svg></span>`;
+}
+
 const PACK_WORDS = new Set(["буркан"]);
+/* Кешът е задължителен, не разкош: catOf по 2253 оферти отнема 865 ms,
+   докато етикетите ги няма, и се вика при ВСЯКО рисуване — всеки чип,
+   всяка буква в търсачката. Празни се при идване на етикетите. */
+const _catCache = new Map();
 function catOf(name) {
+  const hit = _catCache.get(name);
+  if (hit !== undefined) return hit;
+  const res = catOfRaw(name);
+  if (_catCache.size < 60000) _catCache.set(name, res);
+  return res;
+}
+function catOfRaw(name) {
   // AI етикетът печели пред правилата — той разбира смисъла
   if (S.labels) {
     const lb = S.labels[labKey(name)];
@@ -377,6 +1111,75 @@ function catOf(name) {
 }
 const catMeta = id => CATS.find(c => c[0] === id) || [id, "📦", id];
 
+/* ---------- Подсказки при писане ----------
+   Търсенето по дума не може да познае какво имаш предвид: „орехи“ съвпада
+   и с ядките, и с колбасите на марка „Орехите“. Вместо приложението да
+   гадае, показва двете като ОТДЕЛНИ избора и ти решаваш.
+
+   Речникът не е ръчен списък — строи се от типовете и марките, които AI
+   етикетът вече дава, а до всяко предложение стои в колко вериги се
+   намира. Така се вижда и кое си струва да търсиш. */
+const SUG_STOP = new Set(["за", "с", "със", "от", "и", "в", "на", "без",
+  "бр", "гр", "кг", "мл", "л", "г", "вак", "мг"]);
+/* Числата и процентите са РАЗФАСОВКА, не стока: без махането им
+   „кисело мляко 3.6%“ и „кисело мляко 2%“ стоят като две различни
+   предложения и списъкът се пълни с една и съща стока. */
+const sugNorm = t => t.toLowerCase().replace(/\d+[.,]?\d*\s*%?/g, " ")
+  .split(/[^0-9a-zа-яё]+/)
+  .filter(w => w && !SUG_STOP.has(w) && !/^\d/.test(w)).join(" ").trim();
+
+let SUGGEST = null;
+function buildSuggest() {
+  if (!S.labels || !S.search || !S.search.length) return;
+  const idx = new Map();
+  const put = (text, cat, chain, kind) => {
+    const t = sugNorm(text);
+    if (t.length < 3 || t.split(" ").length > 4) return;
+    const k = kind + "|" + t;
+    let e = idx.get(k);
+    if (!e) idx.set(k, e = { t, cat, kind, ch: new Set(), f: fold(t) });
+    e.ch.add(chain);
+  };
+  for (const it of S.search) {
+    const l = labelFor(it.n);
+    if (!l) continue;
+    if (l.t) put(l.t, l.c, it.s, "s");
+    if (l.b && l.b.length >= 3) put(l.b, l.c, it.s, "b");
+  }
+  // Праг по ВЕРИГИ, не по редове: една верига с двайсет разфасовки не
+  // прави стоката разпространена.
+  SUGGEST = [...idx.values()]
+    .map(e => ({ t: e.t, cat: e.cat, kind: e.kind, f: e.f, n: e.ch.size }))
+    .filter(e => e.n >= (e.kind === "s" ? 2 : 3));
+}
+
+function suggestFor(query, max = 6) {
+  if (!SUGGEST) buildSuggest();
+  if (!SUGGEST) return [];
+  const q = fold(query.toLowerCase().trim());
+  if (q.length < 2) return [];
+  const hits = [];
+  for (const e of SUGGEST) {
+    if (!e.f.split(" ").some(w => w.startsWith(q))) continue;
+    // Покритието води; фраза, която ЗАПОЧВА със заявката, получава бонус —
+    // „ориз“ пред „пюре броколи ориз“.
+    hits.push([e, e.n + (e.f.startsWith(q) ? 15 : 0)]);
+  }
+  hits.sort((a, b) => b[1] - a[1] || a[0].t.length - b[0].t.length);
+  // Най-много две от категория. Целта е да се видят РАЗЛИЧНИ неща, а не
+  // шест разновидности на едно и също — точно това прави разликата между
+  // „орехи“ и „Орехите“ видима.
+  const per = {}, out = [];
+  for (const [e] of hits) {
+    const k = e.kind + e.cat;
+    if ((per[k] || 0) >= 2) continue;
+    per[k] = (per[k] || 0) + 1;
+    out.push(e);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 /* ---------- цвят на веригата: огледало на StoreColor ---------- */
 const FALLBACK = ["#6EC1E4","#E4A76E","#9DE46E","#E46EC1","#6E7BE4","#E4D96E","#6EE4C1","#C16EE4"];
 function storeColor(store) {
@@ -389,27 +1192,58 @@ function storeColor(store) {
 }
 
 /* ---------- състояние ---------- */
+/* Четенето на запазеното НЕ бива да гърми.
+   Един повреден запис в localStorage („{broken“, „5“, обект вместо
+   списък) хвърляше при създаването на S — тоест на модулно ниво, преди
+   да е закачен който и да е обработчик. Резултатът е завинаги празна
+   страница без съобщение и без начин за възстановяване освен изтриване
+   на данните на сайта. Същото става, когато самото localStorage хвърля:
+   Safari в частен режим и забранените бисквитки правят точно това. */
+const readArr = (k) => {
+  try { const v = JSON.parse(localStorage.getItem(k)); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+};
+const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const readStr = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+
 const S = {
   idx: null, all: [], search: null, history: null,
   store: null, cat: null, byUnit: false, more: false,
-  tab: "today", query: "",
-  list: JSON.parse(localStorage.getItem("pr_list") || "[]"),
-  checked: new Set(JSON.parse(localStorage.getItem("pr_checked") || "[]")),
-  watch: JSON.parse(localStorage.getItem("pr_watch") || "[]"),
-  seen: new Set(JSON.parse(localStorage.getItem("pr_seen") || "[]")),
-  ranking: null, perItem: null, chosen: null,
+  tab: "today", query: "", limit: 120,
+  list: readArr("pr_list"),
+  amounts: new Map(readArr("pr_amounts").filter(x => Array.isArray(x) && x.length === 2)),
+  checked: new Set(readArr("pr_checked")),
+  watch: readArr("pr_watch"),
+  seen: new Set(readArr("pr_seen")),
+  ranking: null, perItem: null, chosen: null, busy: false,
   cfg: null, reported: {}, repOpen: false,
+  labels: null, labelAliases: 0,
+  detailStack: [], lastRef: null, histPushed: false,
+  hidden: new Set(readArr("pr_hidden")),
+  theme: readStr("pr_theme", "auto"),
 };
+const saveHidden = () => write("pr_hidden", JSON.stringify([...S.hidden]));
+/* Ръчна тема. Без нея важи само prefers-color-scheme, а хората често
+   искат тъмно приложение върху светла система.
+   При „като системата“ атрибутът се МАХА, не се задава празен: празен
+   атрибут пак съществува в DOM-а и `closest("[data-theme]")` от бутоните
+   намираше <html> при всяко щракване където и да е по страницата. */
+function applyTheme() {
+  const d = document.documentElement;
+  if (S.theme === "auto") d.removeAttribute("data-theme");
+  else d.setAttribute("data-theme", S.theme);
+}
 const saveWatch = () => {
-  localStorage.setItem("pr_watch", JSON.stringify(S.watch));
-  localStorage.setItem("pr_seen", JSON.stringify([...S.seen].slice(-400)));
+  write("pr_watch", JSON.stringify(S.watch));
+  write("pr_seen", JSON.stringify([...S.seen].slice(-400)));
 };
 /* Ключовата дума на продукт - същата сметка като в приложението. */
 const kwOfName = n => n.split(/[\s,()]+/)
   .filter(w => w.length >= 3 && !/\d/.test(w)).slice(0, 2).join(" ") || n.slice(0, 20);
 const saveList = () => {
-  localStorage.setItem("pr_list", JSON.stringify(S.list));
-  localStorage.setItem("pr_checked", JSON.stringify([...S.checked]));
+  write("pr_list", JSON.stringify(S.list));
+  write("pr_amounts", JSON.stringify([...S.amounts]));
+  write("pr_checked", JSON.stringify([...S.checked]));
 };
 
 const $ = id => document.getElementById(id);
@@ -420,42 +1254,126 @@ const discountPct = o => {
   if (o.old && o.old > o.price && o.price > 0) return Math.round((1 - o.price / o.old) * 100);
   return null;
 };
-const unitText = o => (o.unitPrice != null && o.unitLabel) ? eur(o.unitPrice) + " " + o.unitLabel.replace("лв","€") : "";
+/* Мерната единица идва от HTML-а на веригите през скрейпъра — значи е
+   външен текст и се екранира като всеки друг. */
+const unitLbl = l => esc(String(l).replace("лв", "€"));
+const unitText = o => (o.unitPrice != null && o.unitLabel)
+  ? eur(o.unitPrice) + " " + unitLbl(o.unitLabel) : "";
+const unitHit = h => (h.u != null && h.l) ? eur(h.u) + " " + unitLbl(h.l) : "";
+/* Линкът също идва от фийда. `esc` пази от чупене на атрибута, но не и от
+   javascript: — затова схемата се проверява изрично. */
+const safeUrl = u => (typeof u === "string" && /^https?:\/\//i.test(u)) ? u : "";
 
-/* ---------- зареждане ---------- */
+/* ---------- зареждане ----------
+   Редът тук има значение, измерен е. Досега офертите се теглеха ЕДНА ПО
+   ЕДНА с рисуване след всяка, а етикетите — накрая. Резултат: 4-5
+   рисувания по ~865 ms, защото без етикети catOf минава през всички
+   правила. Щом дойдат етикетите — 5 ms. Тоест редът беше точно обратният
+   на правилния. Сега етикетите тръгват ПЪРВИ и всичко върви паралелно. */
 async function boot() {
   // офлайн: черупката и последните данни остават достъпни без обхват
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http"))
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
-  feed("config.json").then(c => { S.cfg = c; });
-  S.idx = await feed("feed/index.json");
-  render();
-  if (!S.idx) return;
-  const acc = [];
-  for (const st of S.idx.stores) {
-    const f = await feed("feed/offers-" + st.slug + ".json");
-    if (f && f.offers) acc.push(...f.offers.filter(o => !isJunk(o)));
-    S.all = acc; render();
+    // Работникът съобщава, когато е активирал нова версия. Без това човек
+    // гледа стар код и не разбира защо поправката я няма.
+    navigator.serviceWorker.addEventListener("message", ev => {
+      if (ev.data && ev.data.pr === "updated") S.swUpdated = true;
+    });
   }
-  feed("feed/search.json").then(f => { S.search = f ? f.items : []; });
-  feed("feed/history.json").then(f => { S.history = f; });
-  feed("feed/labels.json").then(f => {
-    S.labels = f ? f.l : null;
-    if (!S.query) render();   // категориите на видимите карти се обновяват
-  });
+  applyTheme();
+  // app-config.json е конфигурацията на ПРИЛОЖЕНИЕТО. Досега тук стоеше
+  // config.json — конфигурацията на СКРЕЙПЪРА, която изобщо няма ключ
+  // reportUrl, значи бутонът „Цената не е вярна“ не можеше да се появи.
+  // Сега файлът е правилният, но `reportUrl` в него още е празен — тоест
+  // докладването остава изключено, същото както в приложението, докато
+  // не се сложи адрес на Google Form.
+  feed("app-config.json").then(c => { S.cfg = c; });
+
+  const pLabels = feed("feed/labels.json").then(applyLabels);
+  // Историята НЕ се тегли при старт. Тя вече покрива всичките 79 вериги,
+  // не само четирите промоционални, значи е ~500 KB — а трябва само
+  // когато човек отвори конкретен продукт.
   feed("feed/digest.json").then(f => {
     S.digest = f ? f.text : null;
     if (S.digest && !S.query) render();
   });
+
+  S.idx = await feed("feed/index.json");
+  render();
+  if (!S.idx) return;
+  const pSearch = loadSearch().then(x => { S.search = x || []; });
+
+  // Всички магазини наведнъж, не един по един.
+  const files = await Promise.all(
+    S.idx.stores.map(st => feed("feed/offers-" + st.slug + ".json")));
+  const acc = [];
+  for (const f of files)
+    if (f && f.updated === S.idx.updated && f.offers) for (const o of f.offers)
+      if (!isJunk(o)) {
+        o.rawName = o.name;
+        o.requiresCard = o.requiresCard ?? /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(o.name);
+        o.name = nameClean(o.name); acc.push(o);
+      }
+  S.all = acc;
+  await pLabels;            // категориите са верни още при първото рисуване
+  render();
+  await pSearch;
+  if (!S.query) render();
+}
+/* Мостът към етикетите. Те са записани по СУРОВОТО име от тръбопровода
+   („омарот нашата витринакг-20% отстъпка с“), а тук имената вече са
+   почистени. Без втори ключ по почистеното име покритието пада наполовина
+   — точно това чупеше сравнението и в приложението. */
+function applyLabels(f) {
+  if (!f || !f.l) { S.labels = null; return; }
+  const m = f.l;
+  let aliases = 0;
+  for (const k of Object.keys(f.l)) {          // снимка: пишем в същия обект
+    const ck = labKey(nameClean(k));
+    if (ck && ck !== k && !(ck in m)) { m[ck] = f.l[k]; aliases++; }
+  }
+  S.labels = m;
+  S.labelAliases = aliases;
+  _catCache.clear();        // етикетът бие правилата — старите отговори падат
+  labelsVersion++;          // и думите на етикета по редовете се разчитат наново
+}
+/* Индексът за търсене се зарежда на ТРИ места (стартиране, кошницата,
+   подсказките). Досега това бяха три различни реда код и едното от тях
+   пропускаше и филтъра, и почистването — тоест докато то беше активно,
+   подсказките показваха слепени имена и добавяха „Омарот“ в списъка. */
+async function loadSearch() {
+  const f = await feed("feed/search.json");
+  if (f && S.idx && f.updated !== S.idx.updated) return null;
+  return f ? f.items.filter(it => it.n && !uncertainCurrency(it.s, it.n, it.p, it.o, null, it.currency)).map(cleanRow) : null;
+}
+function cleanRow(it) {
+  it.requiresCard = it.requiresCard ?? /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(it.n);
+  const c = nameClean(it.n);
+  if (c !== it.n) { it.r = it.n; it.n = c; }
+  // Малките букви веднъж на ред, не милиони пъти в сравнението: df,
+  // docFreq и includes минават през целия индекс за всеки кандидат.
+  it._l = it.n.toLowerCase();
+  return it;
 }
 const JUNK = /^\s*(тествай|печеливш|тест на продукт|играй|спечели|томбола|виж повече|научи повече|седмични предложени|нови продукти|всички продукти|разгледай|каталог|брошура|абонирай|информация за продукт|налично за доставка|не е налично|кошница с грижа|\d+([.,]\d+)?\s*(пране|бр|броя|г|гр|кг|мл|л|ml|g|kg|l)\b)/i;
-const isJunk = o => !o.name || o.name.trim().length < 3 || JUNK.test(o.name)
+function currencyMismatch(name, price) {
+  const values = [...name.matchAll(/(\d+[.,]\d{2})\s*(?:€|EUR)/gi)].map(m => Number(m[1].replace(",", ".")));
+  return values.some(v => Math.abs(v-price) < 0.02) && !values.some(v => Math.abs(v-price/1.95583) < 0.02);
+}
+function uncertainCurrency(store, name, price, old, pct, currency) {
+  if (currencyMismatch(name, price)) return true;
+  const discount = pct ?? (old > price ? Math.round((1 - price / old) * 100) : null);
+  return !currency && ["кауфланд", "kaufland"].includes((store || "").toLowerCase()) &&
+    discount != null && discount >= 46 && discount <= 52;
+}
+const isJunk = o => uncertainCurrency(o.store, o.rawName || o.name || "", o.price, o.old, o.pct, o.currency) || !o.name || o.name.trim().length < 3 || JUNK.test(o.name)
   || o.name.includes("/опаковка") || !(o.price > 0) || o.price > 5000
   || !/[A-Za-zА-Яа-я]{3}/.test(o.name);
 
 /* ---------- изгледи ---------- */
 function render() {
-  $("view").innerHTML = S.tab === "today" ? viewToday() : viewList();
+  $("view").innerHTML = S.tab === "today" ? viewToday()
+    : S.tab === "list" ? viewList() : viewMore();
   document.querySelectorAll(".nav button").forEach(b =>
     b.classList.toggle("on", b.dataset.tab === S.tab));
   bind();
@@ -463,19 +1381,19 @@ function render() {
 
 function offerCard(o) {
   const pct = discountPct(o), ut = unitText(o), c = storeColor(o.store);
-  return `<div class="card" data-open="${esc(JSON.stringify({ t: "offer", s: o.store, n: o.name })).replace(/'/g, "&#39;")}">
-    <div class="bar" style="background:${c}"></div>
-    ${o.img ? `<img loading="lazy" src="${esc(o.img)}" alt="">` : `<div class="noimg" style="color:${c}">${esc(o.store.slice(0, 2).toUpperCase())}</div>`}
+  return `<div class="card" role="button" tabindex="0" style="--sc:${c}" data-open="${esc(JSON.stringify({ t: "offer", s: o.store, n: o.name }))}">
+    ${thumb(o.name, o.img, 60)}
     <div class="mid">
-      <div class="tag" style="color:${c}"><i style="background:${c}"></i>${esc(o.store.toUpperCase())}</div>
+      <div class="tag"><i style="background:${c}"></i>${esc(o.store.toUpperCase())}</div>
       <div class="nm">${esc(o.name)}</div>
+      ${o.requiresCard ? '<span class="pill">Условна цена · карта/купон</span>' : ""}
       ${ut ? `<span class="pill amber">${ut}</span>` : ""}
     </div>
     <div class="pr">
       ${pct ? `<span class="badge">−${pct}%</span>` : ""}
       ${o.old ? `<s>${eur(o.old)} €</s>` : ""}
       <b class="${pct ? "hot" : ""}">${eur(o.price)}<em>€</em></b>
-      <small>${eur(o.price)} €</small>
+      <small>${fmt(o.price)} лв</small>
     </div>
   </div>`;
 }
@@ -483,13 +1401,14 @@ function offerCard(o) {
 function hitRow(h) {
   const c = storeColor(h.s);
   const lbl = SRC_LABEL[h.f] || "";
-  const ut = (h.u != null && h.l) ? fmt(h.u) + " " + h.l : "";
-  return `<div class="card slim" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n })).replace(/'/g, "&#39;")}">
-    <div class="bar" style="background:${c}"></div>
+  const ut = unitHit(h);
+  return `<div class="card" role="button" tabindex="0" style="--sc:${c}" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n }))}">
+    ${thumb(h.n, null, 52)}
     <div class="mid">
-      <div class="tag" style="color:${c}"><i style="background:${c}"></i>${esc(h.s.toUpperCase())}
+      <div class="tag"><i style="background:${c}"></i>${esc(h.s.toUpperCase())}
         ${lbl ? `<span class="pill violet">${lbl}</span>` : ""}</div>
       <div class="nm">${esc(h.n)}</div>
+      ${h.requiresCard ? '<span class="pill">Условна цена · карта/купон</span>' : ""}
       ${ut ? `<span class="pill amber">${ut}</span>` : ""}
     </div>
     <div class="pr">
@@ -502,27 +1421,39 @@ function hitRow(h) {
 function viewToday() {
   if (!S.idx) return `<div class="note">Зареждам фийда… Ако това не изчезне, провери връзката.</div>`;
   const q = S.query.trim();
+  const upd8 = S.swUpdated
+    ? `<div class="panel" style="border:1px solid var(--mint55)">🆕 Има нова версия на сайта.
+       <button class="chip" data-reload style="margin-left:8px">Презареди</button></div>` : "";
 
-  let head = `<div class="search"><input id="q" type="search" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
+  let head = `${q.length < 2 ? '<div class="home-intro"><span>ПАЗАРУВАЙ С ЯСНА СМЕТКА</span><h2>Добрите покупки<br>започват оттук.</h2><button class="home-list" data-tab="list">' + (S.list.length ? "Твоята кошница · " + S.list.length + " продукта" : "Създай твоята кошница") + ' <span aria-hidden="true">↗</span></button></div>' : ""}<div class="search"><input id="q" type="search" aria-label="Търси във всички магазини" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
 
   if (q.length >= 2) {
     if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
+    // Подсказките стоят НАД резултатите, а не вместо тях: пишеш и виждаш
+    // едновременно какво намира сега и какво друго може да имаш предвид.
+    const sug = S.sugOff === q ? [] : suggestFor(q);
+    const sugHtml = sug.length ? `<div class="sug">` + sug.map(e => `
+      <div class="sugrow" role="button" tabindex="0" data-sug="${esc(e.t)}">
+        ${thumb(e.t, null, 30)}
+        <span class="sugt">${esc(e.t)}</span>
+        <span class="mini">${e.kind === "b" ? "марка · " : ""}${esc(catMeta(e.cat)[2])}</span>
+        <b class="mini">${e.n} вериги</b></div>`).join("") + `</div>` : "";
+
     const res = searchIn(S.search, q, 80, true);
-    return head + (res.length
+    return head + sugHtml + (res.length
       ? `<div class="note">${res.length} резултата · подредени по цена за единица</div>` + res.map(hitRow).join("")
       : `<div class="empty"><b>Нищо за „${esc(q)}“</b><p>Пробвай по-обща дума — „мляко“ вместо „прясно мляко Верея 3%“.</p></div>`);
   }
 
   // „Наблизо“: разстояние до най-близкия магазин на всяка верига;
   // веригите извън радиуса изчезват от лентата. Без данни в OSM = остава.
-  const far = c => S.nearOnly && S.geoKm && S.geoKm[c] != null && S.geoKm[c] > NEAR_RADIUS;
+  const far = c => S.hidden.has(c)
+    || (S.nearOnly && S.geoKm && S.geoKm[c] != null && S.geoKm[c] > NEAR_RADIUS);
   const kmTag = c => (S.geoKm && S.geoKm[c] != null && S.geoKm[c] <= NEAR_RADIUS)
     ? " · " + fmtKm(S.geoKm[c]) : "";
 
   const digestHtml = (S.digest && !S.digestGone)
-    ? `<div class="panel" style="display:flex;gap:8px;align-items:flex-start">
-        <span>📡</span><div style="flex:1">${esc(S.digest)}</div>
-        <button class="chip" data-act="nodigest:">✕</button></div>`
+    ? `<details class="daily-note"><summary>Бележка за деня · автоматично резюме</summary><p>${esc(S.digest)}</p></details>`
     : "";
 
   const stores = S.idx.stores.map(s => s.name).filter(c => !far(c));
@@ -539,7 +1470,7 @@ function viewToday() {
 
   const officialOnly = S.store && !stores.includes(S.store);
 
-  let chips = `<div class="chips">` +
+  let chips = `<details class="store-filter"><summary>${S.store ? esc(S.store) : "Всички избрани магазини"} · филтри</summary><div class="chips">` +
     chip("Всички", !S.store, "st:") +
     S.idx.stores.filter(s => !far(s.name)).map(s => chip(esc(s.name + kmTag(s.name)) + ` <u>${s.count}</u>`, S.store === s.name, "st:" + s.name, storeColor(s.name))).join("") +
     chip("за единица", S.byUnit, "unit:", "#F7C266") +
@@ -548,7 +1479,7 @@ function viewToday() {
       (S.more ? extra : extra.filter(c => c === S.store))
         .map(c => chip(esc(c + kmTag(c)), S.store === c, "st:" + c, storeColor(c))).join("") +
       chip(S.more ? "скрий ▴" : "още вериги ▾", false, "more:", "#A695F2")
-    ) : "") + `</div>`;
+    ) : "") + `</div></details>`;
 
   let rows, names;
   if (officialOnly) {
@@ -556,7 +1487,7 @@ function viewToday() {
     rows = S.search.filter(it => it.s === S.store);
     names = rows.map(r => r.n);
   } else {
-    rows = S.all.filter(o => !S.store || o.store === S.store);
+    rows = S.all.filter(o => (!S.store || o.store === S.store) && !S.hidden.has(o.store));
     names = rows.map(r => r.name);
   }
 
@@ -577,7 +1508,7 @@ function viewToday() {
           <b>${esc(kw)}</b> ${hit
             ? `${fresh ? '<span class="pill mintf">ново</span> ' : ""}- ${esc(hit.n.slice(0, 36))} · <b style="color:var(--coral)">${eur(hit.p)} €</b> в ${esc(hit.s)}`
             : "- няма намаление в момента"}</div>
-        <button class="chip" data-unwatch="${esc(kw)}">🔕</button></div>`);
+        <button class="chip" data-unwatch="${esc(kw)}" aria-label="Спри да следиш ${esc(kw)}">🔕</button></div>`);
     }
     watchHtml = `<div class="panel"><b>🔔 Следени думи</b>${rows.join("")}</div>`;
   }
@@ -596,20 +1527,61 @@ function viewToday() {
                     : list.sort((a, b) => a.p - b.p);
     return head + chips + catsBar +
       `<div class="note"><b>${list.length} цени в ${esc(S.store)}</b> — редовни цени от официалните данни на КЗП, не промоции.</div>` +
-      list.slice(0, 400).map(hitRow).join("");
+      list.slice(0, S.limit).map(hitRow).join("") + moreBtn(list.length);
   }
 
   let list = rows.filter(o => !S.cat || catOf(o.name) === S.cat);
   list = S.byUnit ? list.filter(o => o.unitPrice != null).sort((a, b) => a.unitPrice - b.unitPrice)
                   : list.sort((a, b) => (discountPct(b) || 0) - (discountPct(a) || 0));
   const upd = S.idx.updated ? `<div class="note">${list.length} намаления · данните са от ${esc(S.idx.updated)}</div>` : "";
-  return head + digestHtml + chips + watchHtml + catsBar + upd +
-    (list.length ? list.slice(0, 600).map(offerCard).join("")
+  return head + upd8 + chips + watchHtml + catsBar + upd +
+    (list.length ? list.slice(0, S.limit).map(offerCard).join("") + moreBtn(list.length)
       : `<div class="empty"><b>Още зареждам офертите…</b></div>`);
 }
+/* Рисуват се 120 карти, не 600. render() пресъздава целия DOM с innerHTML
+   при всеки чип и всяка буква — 600 карти правят това видимо бавно на
+   телефон, а никой не скролва дотам без да е филтрирал. */
+const moreBtn = total => total > S.limit
+  ? `<button class="big" data-act="limit:">Покажи още (остават ${total - S.limit})</button>` : "";
 
 const chip = (label, on, act, color) =>
   `<button class="chip ${on ? "on" : ""}" data-act="${esc(act)}" ${color ? `style="--c:${color}"` : ""}>${label}</button>`;
+
+/* ---------- „Още“: тема, скрити вериги, състояние ----------
+   Картата „Състояние“ съществува, защото нещата, които се чупят тихо, са
+   най-скъпите: липсващ файл, ненамерени етикети, стар фийд. Ако тук пише
+   „всичко работи“, значи мостът с етикетите и конфигурацията са наред. */
+function viewMore() {
+  const chains = S.idx ? (S.idx.stores.map(s => s.name)
+    .concat(S.idx.chains || []).filter((v, i, a) => a.indexOf(v) === i)) : [];
+  // data-settheme, не data-theme: второто се пише и на <html> и всяко
+  // щракване по страницата щеше да го намира.
+  const th = (id, txt) => `<button class="chip ${S.theme === id ? "on" : ""}" data-settheme="${id}">${txt}</button>`;
+  return `<div class="panel"><b>🎨 Тема</b>
+      <div class="chips themebtns">${th("auto", "Като системата")}${th("dark", "Тъмна")}${th("light", "Светла")}</div></div>
+
+    <div class="panel"><b>🙈 Скрити вериги</b>
+      <div class="note">Веригите, до които така или иначе не ходиш. Изчезват от лентата, от търсенето и от сметката на кошницата.</div>
+      <div class="chips">${chains.map(c =>
+        `<button class="chip ${S.hidden.has(c) ? "on" : ""}" data-hide="${esc(c)}" style="--c:${storeColor(c)}">${S.hidden.has(c) ? "🚫 " : ""}${esc(c)}</button>`).join("")}</div>
+      ${S.hidden.size ? `<button class="chip" data-act="showall:">Покажи всички отново</button>` : ""}</div>
+
+    <div class="panel"><b>📡 Състояние</b>
+      <div class="note">
+        Данни: ${S.idx ? esc(S.idx.updated || "заредени") : "<b style='color:var(--coral)'>няма връзка с фийда</b>"}<br>
+        Оферти: ${S.all.length} · индекс за търсене: ${S.search ? S.search.length + " реда" : "още се тегли"}<br>
+        AI етикети: ${S.labels ? Object.keys(S.labels).length + " (свързани по почистено име: " + S.labelAliases + ")" : "не са заредени"}<br>
+        Конфигурация: ${S.cfg ? "от мрежата" : "вградена (app-config.json не е намерен)"}<br>
+        История: ${S.history && S.history.h ? Object.keys(S.history.h).length + " продукта" : "не е заредена"}<br>
+        Офлайн: ${("serviceWorker" in navigator) ? "включен" : "браузърът не го поддържа"}
+      </div></div>
+
+    <div class="panel"><b>🔔 Известия</b>
+      <div class="note">Уеб версията не може да буди телефона — за това трябва пуш сървър, а Промо Радар няма сървър по замисъл. Затова следените думи докладват на екран „Днес“ при всяко отваряне. Истинските известия при намаление са в приложението за Android.</div></div>
+
+    <div class="panel"><b>ℹ За данните</b>
+      <div class="note">Цените идват от достъпните официални дневни данни на КЗП и от промоционалните брошури на четири вериги. Едно и също нещо в различни магазини рядко е буквално един и същ артикул — затова „По-точно съвпадение“ е отделно от „Подобни продукти“ и когато няма съвпадение, пише честно, че няма.</div></div>`;
+}
 
 /* ---------- наблизо ---------- */
 const NEAR_RADIUS = 20; // км
@@ -640,11 +1612,19 @@ async function toggleNear() {
   }, () => render(), { maximumAge: 600000, timeout: 8000 });
 }
 
-/* ---------- кошницата ---------- */
+/* ---------- кошницата ----------
+   Стоките с най-широко покритие в официалните данни на КЗП. Не са избрани
+   на око — измерени са върху целия индекс от 28 000 реда: всяка присъства
+   в 60+ от 104-те вериги. Точно при такива стоки сравнението на кошницата
+   е честно; при рядка стока просто няма с какво да се сравнява. */
+const QUICK_ITEMS = ["прясно мляко", "кисело мляко", "хляб", "яйца", "олио",
+  "захар", "брашно", "ориз", "кашкавал", "сирене", "домати", "картофи",
+  "боб", "макарони", "лютеница", "кафе"];
+
 function viewList() {
   const items = S.list;
   let html = `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
-  <div class="addrow"><input id="newitem" placeholder="напр. „мляко“, „яйца“, „кайма“" value="${esc(S.nq || "")}"><button data-act="add:">Добави</button></div>`;
+  <div class="addrow"><input id="newitem" aria-label="Добави продукт в списъка" placeholder="напр. „мляко“, „яйца“, „кайма“" value="${esc(S.nq || "")}"><button data-act="add:">Добави</button></div>`;
 
   // Подсказки, докато пишеш — същото преживяване като търсенето в Днес:
   // виждаш истинските цени, преди да решиш. Добавя се ключовата дума,
@@ -659,65 +1639,200 @@ function viewList() {
       .slice(0, 4);
     html += sug.map(h => {
       const kw = kwOf(h);
-      return `<div class="crow" data-addsug="${esc(kw)}" style="cursor:pointer">
+      return `<div class="crow" data-addsug="${esc(kw)}" role="button" tabindex="0" style="cursor:pointer">
+        ${thumb(h.n, null, 34)}
         <div class="cn">${esc(h.n)}<br><small style="opacity:.6">ще добави „${esc(kw)}“</small></div>
         <b>${eur(h.p)} €</b></div>`;
     }).join("");
   }
-  if (!items.length) return html + `<div class="empty"><b>Списъкът е празен</b><p>Добави продукти и натисни „Къде е най-евтино?“.</p></div>`;
+  // Празният екран показваше само поле и бутон — човек трябваше да напише
+  // десет неща, преди да види първото число.
+  if (!items.length) return html +
+    `<div class="note" style="margin-top:14px">Започни оттук — стоки, които ги има почти навсякъде:</div>
+     <div class="chips">${QUICK_ITEMS.map(w => chip(esc(w), false, "quick:" + w)).join("")}</div>
+     <button class="big" data-act="week:">Добави типична седмична кошница</button>`;
+
   html += `<button class="big" data-act="rank:">🧮 Къде е най-евтино?</button>`;
 
-  if (S.ranking) {
-    const r = S.ranking;
-    html += `<div class="panel"><b>🏆 Кошницата по вериги</b>` +
-      r.slice(0, 6).map(([chain, sum, cnt], i) =>
-        `<div class="rrow ${chain === S.chosen ? "sel" : ""}" data-act="chain:${esc(chain)}">
-          ${i === 0 ? "🥇" : (i + 1) + "."} <span style="color:${storeColor(chain)}">${esc(chain)}</span>
-          — ${eur(sum)} € · ${cnt}/${items.length} артикула</div>`).join("") + `</div>`;
+  if (S.ranking && S.ranking.length) {
+    const full = S.ranking.filter(r => r[2] === items.length);
+    const pool = full.length ? full : S.ranking;
+    const best = pool[0];
+    // Спестяваш спрямо ОБИЧАЙНОТО, не спрямо най-скъпия екземпляр.
+    // Най-скъпата верига често е такава заради един сгрешен ред и
+    // числото излизаше по-голямо от самата кошница — което не помага
+    // на никого, а само подяжда доверието.
+    const sums = pool.map(r => r[1]).sort((a, b) => a - b);
+    const median = sums[Math.floor(sums.length / 2)];
+    const save = full.length > 1 ? median - best[1] : 0;
+
+    // Какво точно е сравнено — един ред, преди числата. Без него човек
+    // гледа шест непознати магазина с числа и не разбира нито какво
+    // значат, нито защо тъкмо тези.
+    const what = "за нужните опаковки според зададените количества";
+    const mixed = " Марките може да се различават. Разпознатите оферти с карта и неизвестните количества са изключени.";
+    html += `<div class="panel">
+      <b>Къде излиза най-евтино</b>
+      <div class="note" style="margin:4px 0 10px">Цените са ${what} — така магазините са сравними,
+      само при еднакво пълно покритие.${mixed}
+      Натисни верига, за да видиш нейните цени по артикулите.</div>
+
+      <div class="win" role="button" tabindex="0" data-act="chain:${esc(best[0])}">
+        <div style="flex:1;min-width:0">
+          <div class="winname" style="color:${storeColor(best[0])}">🥇 ${esc(best[0])}</div>
+          <div class="mini">${best[2]} от ${items.length} артикула${
+            save > 0.005 ? ` · <span style="color:var(--mint)">${eur(save)} € под медианата на пълните кошници</span>` : ""}</div>
+        </div>
+        <div class="winsum">${eur(best[1])} €</div>
+      </div>`;
+
+    const rest = pool.slice(1, 6);
+    if (rest.length) html += rest.map(([chain, sum, cnt]) =>
+      `<div class="rrow ${chain === S.chosen ? "sel" : ""}" role="button" tabindex="0" data-act="chain:${esc(chain)}">
+        <span style="color:${storeColor(chain)}">${esc(chain)}</span>
+        <span class="mini">${cnt < items.length ? cnt + " от " + items.length + " · " : ""}${cnt === items.length && best[2] === items.length ? "+" + eur(sum - best[1]) + " €" : "частична сума"}</span>
+        <b>${eur(sum)} €</b><span class="chev">›</span></div>`).join("");
+    html += `<button class="chip" data-sharebasket style="margin-top:10px">📤 Сподели класацията</button></div>`;
+  }
+
+  // --- Избраната верига: какво липсва и колко ще платиш на каса ---
+  if (S.chosen && S.perItem) {
+    const priceIn = it => (S.perItem[it] || []).find(h => h.s === S.chosen);
+    const pack = items.reduce((a, it) => a + (priceIn(it)?.total || 0), 0);
+    const missing = items.filter(it => !priceIn(it));
+    const done = items.filter(i => S.checked.has(i)).length;
+    html += `<div class="panel"><b>🛒 ${esc(S.chosen)}</b>
+      <div class="note" style="margin-top:4px">Нужните опаковки в този магазин струват общо
+        <b style="color:var(--mint)">${eur(pack)} €</b> (${fmt(pack)} лв).
+        ${done ? `Отметнати: ${done} от ${items.length}.` : ""}</div>
+      ${missing.length ? `<div style="color:var(--amber);font-size:12px;margin-top:6px">⚠ ${missing.length} от ${items.length} не се намират тук: ${esc(missing.slice(0, 3).join(", "))}${missing.length > 3 ? "…" : ""}</div>` : ""}
+      ${S.checked.size ? `<button class="chip" data-act="uncheck:" style="margin-top:8px">Изчисти отметките</button>` : ""}
+      </div>`;
   }
 
   for (const it of items) {
     const done = S.checked.has(it);
+    const amount = basketAmount(it);
     const rows = S.perItem ? (S.perItem[it] || []) : [];
-    const inChosen = rows.find(h => h.s === S.chosen);
+    const m = S.mode ? S.mode[it] : null;
+    const here = rows.find(h => h.s === S.chosen);
+    // Първо какво е В ИЗБРАНАТА верига — иначе класацията сочи един
+    // магазин, а редовете отдолу показват съвсем други и нищо не се
+    // връзва. После най-евтините другаде, за сравнение.
+    const others = rows.filter(h => h.s !== S.chosen).slice(0, 2);
     html += `<div class="litem">
       <label><input type="checkbox" data-act="chk:${esc(it)}" ${done ? "checked" : ""}>
         <span class="${done ? "done" : ""}">${esc(it)}</span></label>
-      ${inChosen ? `<b>${eur(inChosen.p)} €</b>` : ""}
-      <button class="x" data-act="del:${esc(it)}">✕</button>
-      ${rows.slice(0, 3).map(h => `<div class="sub" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n })).replace(/'/g, "&#39;")}">
-          <span style="color:${storeColor(h.s)}">${esc(h.s)}</span> ${eur(h.p)} € — ${esc(h.n.slice(0, 38))}</div>`).join("")}
+      ${here ? `<b>${eur(here.total)} €</b>`
+             : (S.perItem ? `<b style="color:var(--amber)">няма</b>` : "")}
+      <button class="x" data-act="del:${esc(it)}" aria-label="Махни ${esc(it)} от списъка">✕</button>
+      <div class="basket-amount"><label>Количество <input aria-label="Количество за ${esc(it)}" type="number" min="0.01" max="1000" step="any" value="${amount.quantity}" data-amount="${esc(it)}"></label><select aria-label="Мярка за ${esc(it)}" data-measure="${esc(it)}">${["кг","л","бр"].map(u => `<option ${u === amount.unit ? "selected" : ""}>${u}</option>`).join("")}</select></div>
+      ${here ? `<div class="sub here" role="button" tabindex="0" data-open="${esc(JSON.stringify({ t: "hit", s: here.s, n: here.n }))}">
+          ${thumb(here.n, null, 26)}
+          <span style="color:${storeColor(here.s)}">${esc(here.s)}</span> — ${esc(here.n.slice(0, 40))}
+          <span class="mini">${here.packs} опак. × ${eur(here.p)} €</span></div>` : ""}
+      ${others.map(h => `<div class="sub" role="button" tabindex="0" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n }))}">
+          ${thumb(h.n, null, 26)}
+          <span style="color:${storeColor(h.s)}">${esc(h.s)}</span>
+          ${eur(h.total)} € общо — ${esc(h.n.slice(0, 30))}</div>`).join("")}
     </div>`;
-  }
-  if (S.chosen && S.perItem) {
-    const total = items.reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
-    const taken = items.filter(i => S.checked.has(i))
-      .reduce((a, it) => a + ((S.perItem[it] || []).find(h => h.s === S.chosen)?.p || 0), 0);
-    html += `<div class="panel"><b>🛒 ${esc(S.chosen)}</b><div>взети ${eur(taken)} от ${eur(total)} € (${fmt(total)} лв)</div></div>`;
   }
   return html;
 }
 
+/* Сметката на кошницата.
+   Четири неща тук я правят честна и всяко е научено от грешка:
+     1. ЦЕНА ЗА ЕДИНИЦА при избора във всяка верига — иначе бутилка 200 мл
+        за 0,79 „бие“ литър за 1,99 и кошниците не са съпоставими;
+     2. филтър по тип с МНОЗИНСТВО — не по първия резултат, той е просто
+        най-евтиният и може да е случаен (за „мляко“ излизаше сирене и
+        после отсяваше самото мляко);
+     3. подредба по ПОКРИТИЕ, после по сума — верига с 3 от 8 артикула не
+        печели с ниска сума;
+     4. липсващото се брои и се показва, вместо да минава за 0,00 лв. */
+let rankVersion = 0;
+function basketDefault(query) {
+  const q = query.toLowerCase();
+  if (q.includes("яйц")) return { quantity: 10, unit: "бр" };
+  if (["прясно мляко", "олио", "вода", "сок"].some(w => q.includes(w))) return { quantity: 1, unit: "л" };
+  if (q.includes("кафе")) return { quantity: 0.5, unit: "кг" };
+  return { quantity: 1, unit: "кг" };
+}
+function basketAmount(item) {
+  const a = S.amounts.get(item);
+  return a && Number.isFinite(a.quantity) && a.quantity > 0 && a.quantity <= 1000 &&
+    ["кг","л","бр"].includes(a.unit) ? a : basketDefault(item);
+}
+function basketQuote(h, amount) {
+  if (!Number.isFinite(amount.quantity) || amount.quantity <= 0 || amount.quantity > 1000 ||
+      !Number.isFinite(h.p) || h.p <= 0 || (h.currency && h.currency !== "BGN")) return null;
+  if (h.requiresCard === true || /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(h.n)) return null;
+  const today = new Date().toLocaleDateString("sv-SE");
+  if ((h.validTo && h.validTo < today) || (h.validFrom && h.validFrom > today)) return null;
+  const unit = (h.qtyUnit || (h.l || "").split("/")[1] || "").trim();
+  if (unit !== amount.unit) return null;
+  const pack = h.qty ?? (Number.isFinite(h.u) && h.u > 0 ? h.p / h.u : null);
+  if (!Number.isFinite(pack) || pack <= 0) return null;
+  const raw = amount.quantity / pack, nearest = Math.round(raw);
+  const packs = h.qty == null && nearest >= 1 && Math.abs(raw - nearest) <= 0.005
+    ? nearest : Math.ceil(raw - 1e-9);
+  if (packs < 1 || packs > 10000) return null;
+  return { ...h, packs, total: Math.round(h.p / 1.95583 * 100) * packs / 100 * 1.95583 };
+}
 async function rank() {
-  if (!S.search) { S.search = (await feed("feed/search.json"))?.items || []; }
-  const per = {};
-  for (const it of S.list) {
-    const bystore = {};
-    for (const h of searchIn(S.search, it, 400, true)) {
-      if (!(h.s in bystore) || h.p < bystore[h.s].p) bystore[h.s] = h;
+  const version = ++rankVersion;
+  S.busy = true;
+  try { await rankInner(version); } finally { if (version === rankVersion) S.busy = false; }
+  if (version === rankVersion) render();
+}
+function comparableRows(item) {
+  const amount = basketAmount(item);
+  let rows = searchIn(S.search, item, 400, true).map(h => basketQuote(h, amount)).filter(Boolean);
+  for (let pass = 0; pass < 3; pass++) {
+    const values = rows.map(h => h.u).filter(u => u != null).sort((a,b) => a-b);
+    if (values.length >= 6) {
+      const median = values[Math.floor(values.length / 2)];
+      rows = rows.filter(h => h.u == null || (h.u >= median / 3 && h.u <= median * 3));
     }
-    per[it] = Object.values(bystore).sort((a, b) => a.p - b.p);
+    const bystore = new Map();
+    for (const h of rows) {
+      const previous = bystore.get(h.s);
+      if (!previous || h.total < previous.total) bystore.set(h.s, h);
+    }
+    rows = [...bystore.values()];
   }
-  const totals = {};
-  for (const it of S.list) for (const h of per[it]) {
-    totals[h.s] = totals[h.s] || [0, 0];
-    totals[h.s][0] += h.p; totals[h.s][1]++;
+  return { rows: rows.sort((a,b) => a.total - b.total), unit: true, label: amount.unit };
+}
+
+async function rankInner(version) {
+  if (!S.search) S.search = (await loadSearch()) || [];
+  if (version !== rankVersion) return;
+  const per = {}, mode = {}, totals = new Map();
+  for (const item of S.list) {
+    const result = comparableRows(item);
+    per[item] = result.rows; mode[item] = { unit: true, label: result.label };
+    for (const h of result.rows) {
+      const total = totals.get(h.s) || [0, 0, 0];
+      total[0] += h.total; total[1]++; total[2] += h.total;
+      totals.set(h.s, total);
+    }
   }
-  S.perItem = per;
-  S.ranking = Object.entries(totals).map(([c, [s, n]]) => [c, s, n])
-    .sort((a, b) => b[2] - a[2] || a[1] - b[1]);
-  S.chosen = S.ranking[0]?.[0] || null;
+  S.perItem = per; S.mode = mode;
+  S.ranking = [...totals].map(([c, [s,n,p]]) => [c,s,n,p])
+    .sort((a,b) => b[2] - a[2] || a[1] - b[1]);
+  if (!S.ranking.some(r => r[0] === S.chosen)) S.chosen = S.ranking[0]?.[0] || null;
+}
+/* Сметката се преизчислява САМА при промяна на списъка. Досега оставаше
+   от предишното смятане: добавен артикул влизаше като 0,00 лв, а
+   знаменателят „X от Y“ растеше — числата лъжеха, докато човек не натисне
+   бутона пак.
+   Рисува се ВЕДНАГА, преди смятането: при бавна връзка rank() чака 3,6 MB
+   и добавеният артикул не се появяваше на екрана със секунди. */
+function listChanged() {
+  rankVersion++; S.ranking = null; S.perItem = null; S.chosen = null;
+  saveList();
   render();
+  if (S.list.length) rank();
 }
 
 /* ---------- детайл ---------- */
@@ -726,7 +1841,7 @@ async function rank() {
    се опитват все по-прости кандидати — кирилските думи преди латинските
    (латинските обикновено са марки), плюс отрязани окончания („вафл“
    хваща и вафла, и вафли) — и печели този с най-много вериги. */
-function compareQuery(name, strict) {
+function compareQueryRaw(name, strict) {
   // Кандидатите, от най-точния към най-общия:
   //   1) първите две смислени кирилски думи („извара маджаров“ намира
   //      същия продукт в другите вериги);
@@ -735,7 +1850,7 @@ function compareQuery(name, strict) {
   //   3) останалите думи и отрязаните им окончания.
   // Определенията („български“, „продукт“, „натурален“) не са стоки и
   // се прескачат, а имената се разлепят („продуктИзвара“ → две думи).
-  // В строгия режим („същата стока“) остават само комбинациите стока +
+  // В строгия режим („по-точни съвпадения“) остават само комбинациите стока +
   // марка — по-добре честно „няма я другаде“, отколкото друга марка.
   const cat = catOf(name);
   // Плод и месо се продават на тегло — ред в милилитри („БОЧКО ПЗ ПЪПЕШ
@@ -749,7 +1864,7 @@ function compareQuery(name, strict) {
   const lat = toks.filter(w => !/[а-я]/.test(w) && !cmpStop(w));
   const head = cat !== "drugo" ? toks.find(w => !cmpStop(w) && catOf(w) === cat) : null;
   if (strict) {
-    // „Същата стока“ = стоката + ОТЛИЧИТЕЛНАТА дума (марката). Как се
+    // „По-точно съвпадение“ = стоката + ОТЛИЧИТЕЛНАТА дума (марката). Как се
     // познава марката без списък с марки:
     //   · съставките отпадат — дума след „с/със/от/вкус“ описва пълнежа
     //     („ВАФЛИ С КАКАО“ → какао не е марка);
@@ -770,26 +1885,22 @@ function compareQuery(name, strict) {
     const CAP = 150;
     const df = t => {
       let n = 0;
-      for (const it of S.search) if (it.n.toLowerCase().includes(t) && ++n > CAP) break;
+      for (const it of S.search) if (it._l.includes(t) && ++n > CAP) break;
       return n;
     };
     const head2 = head || cyr[0] || null;   // „Тоалетна хартия Zewa“ няма
     // Най-точният път: каноничният продукт от AI — еднакво p значи
-    // същата стока, същата разфасовка, до стотинка.
-    const myLab = S.labels && S.labels[labKey(name)];
+    // по-точни съвпадения, същата разфасовка, до стотинка.
+    const myLab = labelFor(name);
     if (myLab && myLab.p) {
-      let ev = pricesEverywhere(S.search, myLab.p.split(" ").slice(0, 3).join(" "));
-      ev = ev.filter(r => {
-        const lb = S.labels[labKey(r.n)];
-        return lb && lb.p === myLab.p;
-      });
+      const ev = pricesEverywhere(S.search, myLab.p.split(" ").slice(0, 3).join(" "),
+        r => { const lb = labelFor(r.n); return lb && lb.p === myLab.p && kCompatible(name, r.n); });
       if (ev.length >= 2) return [ev, myLab.p];
     }
 
-    // Разпозната марка = единственият партньор („същата стока“ = същата
+    // Разпозната марка = единственият партньор („по-точни съвпадения“ = същата
     // марка). Никакво падане към общи думи като „complete“.
-    const lbb = S.labels && S.labels[labKey(name)] && S.labels[labKey(name)].b
-      ? S.labels[labKey(name)].b.split(" ")[0] : null;
+    const lbb = myLab && myLab.b ? myLab.b.split(" ")[0] : null;
     const brand = (lbb && lbb.length >= 3 && toks.includes(lbb) ? lbb : null)
       || toks.find(w => BRANDS.has(w));
     if (brand) {
@@ -799,10 +1910,9 @@ function compareQuery(name, strict) {
       pool.push(brand);
       let sqb = pool[0];
       for (const q of pool) {
-        let ev = pricesEverywhere(S.search, q);
-        if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
-        ev = unitGuard(ev);
-        ev = ev.filter(r => r.n.toLowerCase().includes(bstem));
+        const ev = unitGuard(pricesEverywhere(S.search, q, r =>
+          (cat === "drugo" || catOf(r.n) === cat) && kCompatible(name, r.n)
+          && r._l.includes(bstem)));
         if (ev.length >= 2) return [ev, q];
         sqb = q;
       }
@@ -819,83 +1929,186 @@ function compareQuery(name, strict) {
       const isCyr = /[а-я]/.test(t);
       const stem = isCyr && t.length >= 5 ? t.slice(0, -1) : t;
       for (const q of new Set([head2 + " " + t, head2 + " " + stem])) {
-        let ev = pricesEverywhere(S.search, q);
-        if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
-      ev = unitGuard(ev);
-        ev = ev.filter(r => r.n.toLowerCase().includes(stem));
+        const ev = unitGuard(pricesEverywhere(S.search, q, r =>
+          (cat === "drugo" || catOf(r.n) === cat) && kCompatible(name, r.n)
+          && r._l.includes(stem)));
         if (ev.length >= 2) return [ev, q];
         sq = q;
       }
     }
     if (!partners.length && cyr.length >= 2) {
       const q = cyr[0] + " " + cyr[1];
-      let ev = pricesEverywhere(S.search, q);
-      if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
-      ev = unitGuard(ev);
+      const ev = unitGuard(pricesEverywhere(S.search, q, r =>
+        (cat === "drugo" || catOf(r.n) === cat) && kCompatible(name, r.n)));
       if (ev.length >= 2) return [ev, q];
       sq = q;
     }
     return [[], sq];
   }
-  const cands = [];
+
+  // --- широк режим („подобни продукти“) ---
+  // Първо типът от AI: това е същинското „подобни“. Полето `t` е точно
+  // отговорът на въпроса „какво е това“ и досега не се четеше никъде.
+  const aiType = typeOf(name);
+  if (aiType.length >= 3 && !tooGeneric(aiType)) {
+    const byType = unitGuard(pricesEverywhere(S.search, aiType, r =>
+      typeOf(r.n).toLowerCase() === aiType.toLowerCase() && kCompatible(name, r.n)));
+    if (byType.length >= 3) return [byType, aiType];
+    // Типовете от AI са много подробни („балсам лайка бяло“) — 9 093
+    // различни типа за 29 799 етикета. Само ВОДЕЩАТА дума вдига покритието
+    // от 10.4% на 37%.
+    const headType = aiType.split(" ")[0].trim();
+    if (headType.length >= 4 && !tooGeneric(headType)) {
+      const byHead = unitGuard(pricesEverywhere(S.search, headType, r =>
+        typeOf(r.n).split(" ")[0].toLowerCase() === headType.toLowerCase()
+        && kCompatible(name, r.n)));
+      if (byHead.length >= 3) return [byHead, headType];
+    }
+  }
+
+  let cands = [];
   if (cyr.length >= 2) cands.push(cyr[0] + " " + cyr[1]);
-  if (head) { cands.push(head); if (head.length >= 5) cands.push(head.slice(0, -1)); }
-  for (const w of cyr.slice(0, 4)) { cands.push(w); if (w.length >= 5) cands.push(w.slice(0, -1)); }
-  for (const w of lat.slice(0, 2)) cands.push(w);
+  if (head && !tooGeneric(head)) { cands.push(head); if (head.length >= 5) cands.push(head.slice(0, -1)); }
+  for (const w of cyr.slice(0, 4)) {
+    if (tooGeneric(w)) continue;
+    cands.push(w); if (w.length >= 5) cands.push(w.slice(0, -1));
+  }
+  for (const w of lat.slice(0, 2)) if (!tooGeneric(w)) cands.push(w);
+  cands = [...new Set(cands)];
+  // Праг по честота: дума, срещана в над 1,5% от каталога, не различава
+  // нищо. Точно така „нашата“ печелеше — среща се навсякъде.
+  const freqCap = Math.max(12, Math.floor(S.search.length * 15 / 1000));
+  const strong = cands.filter(q =>
+    q.length >= 4 && (q.includes(" ") || docFreq(q, freqCap) < freqCap));
+  if (strong.length) cands = strong;
+
+  const keep = r => (cat === "drugo" || catOf(r.n) === cat) && kCompatible(name, r.n);
   let best = [], bq = cands[0] || name.slice(0, 20);
-  for (const q of [...new Set(cands)]) {
-    let ev = pricesEverywhere(S.search, q);
-    if (cat !== "drugo") ev = ev.filter(r => catOf(r.n) === cat);
-      ev = unitGuard(ev);
+  for (const q of cands) {
+    const ev = unitGuard(pricesEverywhere(S.search, q, keep));
     if (ev.length > best.length) { best = ev; bq = q; }
-    if (best.length >= 4) break;
+    if (best.length >= 4) return [best, bq];
+  }
+  // Строгият вид не намери почти нищо. По-добре по-широк списък, отколкото
+  // празен екран — но алкохолът остава изключен, защото точно той беше
+  // същинската грешка.
+  //
+  // Ако строгият вече е дал 3+, мекият изобщо не се пуска: за едно и също
+  // `q` мекият винаги връща НАДМНОЖЕСТВО, значи по-малко точен отговор, а
+  // и цикълът минава втори път през целия индекс.
+  if (best.length >= 3) return [best, bq];
+  const soft = r => (cat === "drugo" || catOf(r.n) === cat)
+    && isAlcohol(r.n) === isAlcohol(name);
+  for (const q of cands) {
+    const ev = unitGuard(pricesEverywhere(S.search, q, soft));
+    if (ev.length > best.length) { best = ev; bq = q; }
+    if (best.length >= 3) return [best, bq];
   }
   return [best, bq];
 }
+/* Сравнението минава през целия индекс по няколко кандидата — 0,4-2 s на
+   продукт. А се вика при всяко отваряне на детайл и при всяко превключване
+   между „Подобни“ и „По-точно съвпадение“, тоест по няколко пъти за един и същ
+   продукт. Кешът прави второто натискане мигновено. */
+const _cmpCache = new Map();
+function compareQuery(name, strict) {
+  const k = (strict ? "1|" : "0|") + name;
+  const hit = _cmpCache.get(k);
+  if (hit) return hit;
+  const res = compareQueryRaw(name, strict);
+  if (_cmpCache.size < 400) _cmpCache.set(k, res);
+  return res;
+}
 const CMP_STOP = CMP_STOP_K; // генерирано от Kotlin
 const cmpStop = w => CMP_STOP.some(s => w.startsWith(s));
+/* Дума, твърде обща, за да се сравнява по нея. „напитка“, „мляко“, „хляб“
+   описват цял рафт, не стока — сравнението по тях е случайна извадка от
+   най-евтиното в категорията. */
+const TOO_GENERIC = ["напитк","питие","мляко","млечн","хляб","хлебн","месо","месн",
+  "риба","рибн","сирен","кашкав","кафе","чай","сок","вода","олио","оцет","ориз",
+  "захар","брашно","сол","тесто","консерв","продукт","стока","различн","видов",
+  "сорт","асорти","микс","опаковк","пакет","промо","нов","класик"];
+/* Служебни думи — никога не могат да са ключ. Причината този списък да
+   съществува: счупеното „Омарот нашата витрина кг“ даваше кандидат
+   „нашата“, а по него излизаха хляб „от нашата пекарна“ и шпек „Нашата
+   Трапеза“ до омар за 30 евро. */
+const FUNCTION_WORDS = new Set(["нашата","нашето","нашия","нашият","нашите",
+  "наша","наше","наш","витрина","витрината","пекарна","пекарната","скара",
+  "кухня","магазин","магазина","магазините","цена","цената","цени","със",
+  "без","или","при","над","под","как","този","тази","това","тези","всеки",
+  "всяка","всички","само","още","най","супер","мега","екстра","special",
+  "нови","нова","ново","оферта","оферти","избор"]);
+function tooGeneric(w) {
+  const s = w.toLowerCase();
+  return FUNCTION_WORDS.has(s) || TOO_GENERIC.some(t => s.startsWith(t));
+}
+/* В колко имена се среща думата. Спира се на `cap` — точното число няма
+   значение, важи само дали думата различава нещо. */
+function docFreq(token, cap) {
+  const t = token.toLowerCase();
+  let n = 0;
+  for (const x of S.search) if (x._l.includes(t) && ++n >= cap) return n;
+  return n;
+}
 
-async function openDetail(ref) {
-  S.lastRef = ref;
+/* Навигация в детайла. Натискането на ред от „Цените навсякъде“ отваря
+   онзи продукт, а „‹ Назад“ (и системният бутон назад) връща. Досега
+   редовете бяха просто текст — гледаш по-евтина цена в друга верига и
+   няма как да стигнеш до нея. */
+function openDetail(ref, push = true) {
   const o = ref.t === "offer"
     ? S.all.find(x => x.store === ref.s && x.name === ref.n)
     : null;
-  const base = o || S.search?.find(x => x.s === ref.s && x.n === ref.n);
+  const base = o || (S.search && S.search.find(x => x.s === ref.s && x.n === ref.n));
+  // Проверката е ПРЕДИ да се пипне навигацията. Иначе при ненамерен
+  // продукт листът оставаше показал предишния, S.lastRef сочеше призрак и
+  // следващият „Назад“ отваряше пак него — бутонът изглеждаше счупен.
   if (!base) return;
+  if (push && S.lastRef) S.detailStack.push(S.lastRef);
+  if (S.detailStack.length > 20) S.detailStack.shift();
+  S.lastRef = ref;
   const name = o ? o.name : base.n, store = o ? o.store : base.s;
+  const raw = (o ? o.rawName : base.r) || name;
   const price = o ? o.price : base.p, old = o ? o.old : base.o;
   const pct = o ? discountPct(o) : (old && old > price ? Math.round((1 - price / old) * 100) : null);
-  const ut = o ? unitText(o) : ((base.u != null && base.l) ? eur(base.u) + " " + base.l.replace("лв","€") : "");
+  const ut = o ? unitText(o) : unitHit(base);
 
   let html = `<div class="dtop">
-    ${o && o.img ? `<img src="${esc(o.img)}" alt="">` : ""}
-    <div class="tag" style="color:${storeColor(store)}"><i style="background:${storeColor(store)}"></i>${esc(store.toUpperCase())}</div>
+    ${S.detailStack.length ? `<button class="chip" data-back style="margin-bottom:8px">‹ Назад</button>` : ""}
+    <div class="dhero">${thumb(name, o ? o.img : null, 132)}</div>
+    <div class="tag"><i style="background:${storeColor(store)}"></i>${esc(store.toUpperCase())}</div>
     <h2>${esc(name)}</h2>
     <div class="dprice"><b class="${pct ? "hot" : ""}">${eur(price)} €</b><span>${fmt(price)} лв</span>
       ${old ? `<s>${eur(old)} €</s>` : ""}${pct ? `<span class="badge">−${pct}%</span>` : ""}</div>
     ${ut ? `<div class="pill amber">${ut}</div>` : ""}
+    <div class="note">${base.requiresCard ? "Условна цена с карта/купон. " : ""}${base.validTo ? "Валидна до " + esc(base.validTo) + "." : "Срокът и наличността не са потвърдени — провери в магазина."}</div>
   </div>`;
 
   if (S.search) {
     const [ev, kw] = compareQuery(name, S.cmpStrict);
     const modeBtns = `<div class="chips" style="margin:6px 0">
       <button class="chip ${S.cmpStrict ? "" : "on"}" data-cmpmode="0">Подобни продукти</button>
-      <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">Същата стока</button></div>`;
+      <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">По-точно съвпадение</button></div>`;
     if (ev.length >= 2) {
       const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
       html += `<h3>Цените навсякъде</h3>${modeBtns}
-      <div class="note">в ${ev.length} вериги · от ${eur(lo)} до ${eur(hi)} € · ${S.cmpStrict ? "същата стока" : "подобни продукти"} по „${esc(kw)}“</div>` +
-        ev.slice(0, 7).map((h, i) => `<div class="crow ${i === 0 ? "best" : ""} ${h.s === store ? "cur" : ""}">
-          <span class="tag" style="color:${storeColor(h.s)}"><i style="background:${storeColor(h.s)}"></i>${esc(h.s.toUpperCase())}</span>
-          ${i === 0 ? '<span class="pill mintf">най-евтино</span>' : ""}
-          ${h.s === store ? '<span class="mini">← гледаш това</span>' : ""}
+      <div class="note">в ${ev.length} вериги · от ${eur(lo)} до ${eur(hi)} € за опаковка · ${S.cmpStrict ? "по-точни съвпадения" : "подобни продукти"} по „${esc(kw)}“</div>` +
+        ev.slice(0, 7).map((h, i) => {
+          const here = h.s === store && h.n === name;
+          return `<div class="crow" ${here ? "" :
+            `role="button" tabindex="0" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n }))}"`}>
+          ${thumb(h.n, null, 34)}
+          <span class="tag"><i style="background:${storeColor(h.s)}"></i>${esc(h.s.toUpperCase())}</span>
+          
+          ${here ? '<span class="mini">← гледаш това</span>' : ""}
           <div class="cn">${esc(h.n)}</div>
-          <b>${eur(h.p)} €</b>${(h.u != null && h.l) ? `<small>${eur(h.u)} ${h.l.replace("лв","€")}</small>` : ""}
-        </div>`).join("");
+          <b>${eur(h.p)} €</b>${unitHit(h) ? `<small>${unitHit(h)}</small>` : ""}
+          ${here ? "" : '<span class="chev">›</span>'}
+        </div>`; }).join("");
     } else {
       html += `<h3>Цените навсякъде</h3>${modeBtns}
       <div class="note">${S.cmpStrict
-        ? "Не намерих същата стока в друга верига — виж „Подобни продукти“."
+        ? "Не намерих по-точни съвпадения в друга верига — виж „Подобни продукти“."
         : "Не намерих подобен продукт в друга верига."}</div>`;
     }
   } else {
@@ -903,8 +2116,13 @@ async function openDetail(ref) {
   }
 
   if (S.history) {
-    const key = store.trim().toLowerCase() + "|" + name.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 60);
-    const h = S.history.h && S.history.h[key];
+    // Ключът се строи ТОЧНО както в тръбопровода — от СУРОВОТО име.
+    // След NameClean показваното име е друго, затова се пробват двете:
+    // разминаване тук значи вечно празна графика.
+    const hk = n => store.trim().toLowerCase() + "|"
+      + n.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 60);
+    const hs = S.history.h || {};
+    const h = hs[hk(raw)] || hs[hk(name)];
     if (h && h.p.length >= 2) {
       html += `<h3>История на цената</h3><canvas id="chart" height="130"></canvas>
         <div class="note">${h.d[0]} → ${h.d[h.d.length - 1]} · всяка точка е засечена промяна</div>`;
@@ -912,6 +2130,8 @@ async function openDetail(ref) {
     } else if (h) {
       html += `<div class="note">История: следим тази цена от ${h.d[0]} — графиката се появява при първата промяна.</div>`;
     }
+  } else if (S.histPending) {
+    html += `<div class="note">Тегля историята на цената…</div>`;
   }
 
   const kw = kwOfName(name);
@@ -923,13 +2143,13 @@ async function openDetail(ref) {
       repHtml = `<div class="note">✅ Докладът е приет — благодаря!</div>`;
     } else if (S.repOpen === repKey) {
       repHtml = `<div class="panel"><b>⚠ Какво не е наред?</b>
-        <select id="repkind" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
+        <select id="repkind" aria-label="Какво не е наред с цената" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
           <option value="по-висока">В магазина е по-скъпо</option>
           <option value="по-ниска">В магазина е по-евтино</option>
           <option value="изтекла">Промоцията е изтекла</option>
           <option value="липсва">Продуктът липсва</option>
           <option value="друго">Друго</option></select>
-        <input id="repprice" inputmode="decimal" placeholder="реалната цена (по избор)"
+        <input id="repprice" inputmode="decimal" aria-label="Реалната цена в магазина" placeholder="реалната цена (по избор)"
           style="width:100%;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
         <button class="btn" style="margin-top:8px" data-repsend="${esc(repKey)}"
           data-store="${esc(store)}" data-name="${esc(name)}" data-price="${fmt(price)}">Изпрати доклада</button></div>`;
@@ -937,20 +2157,61 @@ async function openDetail(ref) {
       repHtml = `<button class="btn ghost" data-repbtn="${esc(repKey)}">⚠ Цената не е вярна</button>`;
     }
   }
+  const url = o ? safeUrl(o.url) : "";
   html += `<div class="dbtns">
-    ${o && o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">🔗 Виж в сайта на магазина</a>` : ""}
+    ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">🔗 Виж в сайта на магазина</a>` : ""}
     <button class="btn" data-watch="${esc(kw)}">${watching ? "🔕 Спри следенето" : "🔔 Следи „" + esc(kw) + "“"}</button>
+    <button class="btn ghost" data-addlist="${esc(kw)}">🛒 Добави „${esc(kw)}“ в списъка</button>
     ${repHtml}
     <button class="btn" data-share="${esc(name)}|${eur(price)} €|${esc(store)}${pct ? "|" + pct : ""}">📤 Сподели</button>
     <button class="btn ghost" data-close>Затвори</button>
   </div>`;
 
+  if (!S.history && !S.histPending) {
+    // Първото отваряне на продукт тегли историята и пре-рисува листа.
+    S.histPending = true;
+    feed("feed/history.json").then(f => {
+      S.history = f || { h: {} };
+      S.histPending = false;
+      if ($("modal").classList.contains("open") && S.lastRef)
+        openDetail(S.lastRef, false);
+    });
+  }
+
+  const actionStart = html.lastIndexOf('<div class="dbtns">');
+  const actions = html.slice(actionStart);
+  html = html.slice(0, actionStart);
+  const afterHero = html.indexOf("</div>", html.indexOf('class="dprice"')) + 6;
+  html = html.slice(0, afterHero) + actions + html.slice(afterHero);
   $("sheet").innerHTML = html;
-  $("modal").classList.add("open");
+  const m = $("modal");
+  if (!m.classList.contains("open")) {
+    m.classList.add("open");
+    // Системният бутон „назад“ на Android затваряше цялото приложение,
+    // вместо детайла. Един запис в историята решава това.
+    if (!S.histPushed) { history.pushState({ pr: "detail" }, ""); S.histPushed = true; }
+  }
+  m.scrollTop = 0;
+  $("sheet").focus();
+}
+function closeDetail(fromHistory) {
+  $("modal").classList.remove("open");
+  S.detailStack = [];
+  S.lastRef = null;
+  if (S.histPushed && !fromHistory) { S.histPushed = false; history.back(); }
+  else S.histPushed = false;
+  render();   // следените думи може да са се променили в детайла
 }
 
 function drawChart(h) {
   const cv = $("chart"); if (!cv) return;
+  // Цветовете идват от темата, не са зашити. В светла тема ментовото
+  // #3FDDA2 върху бял панел е контраст 1.74:1 — кривата практически
+  // изчезва, а тъмната мрежа доминира картината.
+  const css = getComputedStyle(document.documentElement);
+  const V = (n, d) => (css.getPropertyValue(n) || "").trim() || d;
+  const cMint = V("--mint", "#3FDDA2"), cLine = V("--line", "#374551"),
+        cLo = V("--lo", "#95A4B1");
   const dpr = window.devicePixelRatio || 1;
   const W = cv.clientWidth, H = 130;
   cv.width = W * dpr; cv.height = H * dpr;
@@ -959,31 +2220,40 @@ function drawChart(h) {
   const span = Math.max(max - min, 0.01);
   const X = i => 8 + (W - 16) * i / (h.p.length - 1);
   const Y = p => 10 + (H - 30) * (1 - (p - min) / span);
-  g.strokeStyle = "#374551"; g.lineWidth = 1;
+  g.strokeStyle = cLine; g.lineWidth = 1;
   for (let i = 0; i <= 2; i++) { g.beginPath(); g.moveTo(0, 10 + (H - 30) * i / 2); g.lineTo(W, 10 + (H - 30) * i / 2); g.stroke(); }
-  g.strokeStyle = "#3FDDA2"; g.lineWidth = 3; g.lineJoin = "round"; g.beginPath();
+  g.strokeStyle = cMint; g.lineWidth = 3; g.lineJoin = "round"; g.beginPath();
   h.p.forEach((p, i) => i ? g.lineTo(X(i), Y(p)) : g.moveTo(X(i), Y(p)));
   g.stroke();
   const grad = g.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "rgba(63,221,162,.28)"); grad.addColorStop(1, "rgba(63,221,162,0)");
+  // color-mix дава прозрачност върху цвят от променлива, каквото и да е той
+  grad.addColorStop(0, `color-mix(in srgb, ${cMint} 26%, transparent)`);
+  grad.addColorStop(1, `color-mix(in srgb, ${cMint} 0%, transparent)`);
   g.lineTo(X(h.p.length - 1), H); g.lineTo(X(0), H); g.closePath(); g.fillStyle = grad; g.fill();
-  g.fillStyle = "#3FDDA2";
+  g.fillStyle = cMint;
   h.p.forEach((p, i) => { g.beginPath(); g.arc(X(i), Y(p), 4, 0, 7); g.fill(); });
-  g.fillStyle = "#95A4B1"; g.font = "11px system-ui";
+  g.fillStyle = cLo; g.font = "11.5px system-ui";
   g.fillText("макс " + eur(max) + " €", 8, 9); g.fillText("мин " + eur(min) + " €", 8, H - 3);
 }
 
 /* ---------- събития ---------- */
 function bind() {
   const q = $("q");
-  if (q) q.oninput = () => { S.query = q.value; renderKeepFocus(); };
+  // S.limit се нулира при нова заявка: иначе след няколко „Покажи още“
+  // всяка натисната буква пречертава 1400 карти.
+  if (q) q.oninput = () => {
+    S.query = q.value;
+    if (S.sugOff !== S.query) S.sugOff = null;   // ново писане → пак подсказки
+    S.limit = 120;
+    renderKeepFocus();
+  };
   const ni = $("newitem");
   if (ni) {
     ni.onkeydown = e => { if (e.key === "Enter") addItem(); };
     ni.oninput = async () => {
       S.nq = ni.value;
       if (S.nq.trim().length >= 2 && !S.search)
-        S.search = (await feed("feed/search.json"))?.items || null;
+        S.search = await loadSearch();
       renderKeepFocus("newitem");
     };
   }
@@ -994,27 +2264,77 @@ function renderKeepFocus(id = "q") {
   const el = $(id);
   if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
 }
-function addItem() {
-  const v = $("newitem")?.value.trim();
-  if (v && !S.list.includes(v)) { S.list.push(v); S.ranking = null; saveList(); }
+/* Добавянето е БЕЗ регистър — иначе „Мляко“ и „мляко“ ставаха два реда и
+   се брояха два пъти. */
+function addItem(val) {
+  const el = $("newitem");
+  const v = (val != null ? val : (el ? el.value : "")).trim();
+  if (v && !S.list.some(x => x.toLowerCase() === v.toLowerCase())) {
+    S.list.push(v);
+    S.nq = "";
+    listChanged();
+    return;
+  }
   S.nq = "";
   render();
 }
 
+document.addEventListener("change", e => {
+  const item = e.target.dataset.amount || e.target.dataset.measure;
+  if (!item) return;
+  const previous = basketAmount(item);
+  const amount = e.target.dataset.amount
+    ? { ...previous, quantity: Number(e.target.value) } : { ...previous, unit: e.target.value };
+  if (!Number.isFinite(amount.quantity) || amount.quantity <= 0 || amount.quantity > 1000 ||
+      !["кг","л","бр"].includes(amount.unit)) { e.target.value = previous.quantity; return; }
+  S.amounts.set(item, amount); listChanged();
+});
 document.addEventListener("click", e => {
   const open = e.target.closest("[data-open]");
   if (open) { openDetail(JSON.parse(open.dataset.open)); return; }
-  if (e.target.closest("[data-close]") || e.target.id === "modal") {
-    $("modal").classList.remove("open");
-    render();   // следените думи може да са се променили в детайла
+  if (e.target.closest("[data-back]")) {
+    const prev = S.detailStack.pop();
+    if (prev) openDetail(prev, false); else closeDetail();
     return;
   }
+  if (e.target.closest("[data-close]") || e.target.id === "modal") {
+    closeDetail();
+    return;
+  }
+  const th = e.target.closest("[data-settheme]");
+  if (th) {
+    S.theme = th.dataset.settheme;
+    write("pr_theme", S.theme);
+    applyTheme(); render(); return;
+  }
+  const hd = e.target.closest("[data-hide]");
+  if (hd) {
+    const c = hd.dataset.hide;
+    S.hidden.has(c) ? S.hidden.delete(c) : S.hidden.add(c);
+    if (S.store && S.hidden.has(S.store)) S.store = null;
+    saveHidden();
+    if (S.list.length && S.perItem) rank(); else render();
+    return;
+  }
+  const sb = e.target.closest("[data-sharebasket]");
+  if (sb && S.ranking) {
+    // Покритието влиза в текста: „12,40 €“ без „8 от 8“ подвежда.
+    const txt = "🛒 Кошницата ми по вериги:\n" + S.ranking.slice(0, 5)
+      .map(([c, s, n], i) => `${i + 1}. ${c} — ${eur(s)} € · ${n} от ${S.list.length} артикула`)
+      .join("\n") + "\n\n📡 Сметнато с Промо Радар";
+    if (navigator.share) navigator.share({ text: txt }).catch(() => {});
+    else if (navigator.clipboard) { navigator.clipboard.writeText(txt); sb.textContent = "✓ Копирано"; }
+    return;
+  }
+  const al = e.target.closest("[data-addlist]");
+  if (al) { addItem(al.dataset.addlist); closeDetail(); return; }
+  if (e.target.closest("[data-reload]")) { location.reload(); return; }
   const w = e.target.closest("[data-watch]");
   if (w) {
     const kw = w.dataset.watch;
     S.watch = S.watch.includes(kw) ? S.watch.filter(x => x !== kw) : [...S.watch, kw];
     saveWatch();
-    if (S.lastRef) openDetail(S.lastRef); else render();
+    if (S.lastRef) openDetail(S.lastRef, false); else render();
     return;
   }
   const uw = e.target.closest("[data-unwatch]");
@@ -1023,10 +2343,10 @@ document.addEventListener("click", e => {
     saveWatch(); render(); return;
   }
   const rb = e.target.closest("[data-repbtn]");
-  if (rb) { S.repOpen = rb.dataset.repbtn; if (S.lastRef) openDetail(S.lastRef); return; }
+  if (rb) { S.repOpen = rb.dataset.repbtn; if (S.lastRef) openDetail(S.lastRef, false); return; }
   const rs = e.target.closest("[data-repsend]");
   if (rs) {
-    const f = S.cfg.reportFields || {};
+    const f = (S.cfg && S.cfg.reportFields) || {};
     const body = new URLSearchParams();
     const vals = { store: rs.dataset.store, product: rs.dataset.name,
                    shownPrice: rs.dataset.price,
@@ -1035,21 +2355,25 @@ document.addEventListener("click", e => {
     for (const k in f) if (vals[k] != null) body.append(f[k], vals[k]);
     fetch(S.cfg.reportUrl, { method: "POST", mode: "no-cors", body }).catch(() => {});
     S.reported[rs.dataset.repsend] = 1; S.repOpen = false;
-    if (S.lastRef) openDetail(S.lastRef);
+    if (S.lastRef) openDetail(S.lastRef, false);
     return;
   }
   const sug = e.target.closest("[data-addsug]");
-  if (sug) {
-    const kw = sug.dataset.addsug;
-    if (kw && !S.list.includes(kw)) { S.list.push(kw); S.ranking = null; saveList(); }
-    S.nq = "";
+  if (sug) { addItem(sug.dataset.addsug); return; }
+  const sq = e.target.closest("[data-sug]");
+  if (sq) {
+    // Избраната подсказка става заявка, а списъкът се скрива — иначе
+    // остава да виси над собствения си резултат.
+    S.query = sq.dataset.sug;
+    S.sugOff = S.query;
+    S.limit = 120;
     render();
     return;
   }
   const cm = e.target.closest("[data-cmpmode]");
   if (cm) {
     S.cmpStrict = cm.dataset.cmpmode === "1";
-    if (S.lastRef) openDetail(S.lastRef);
+    if (S.lastRef) openDetail(S.lastRef, false);
     return;
   }
   const sh = e.target.closest("[data-share]");
@@ -1061,22 +2385,55 @@ document.addEventListener("click", e => {
     return;
   }
   const nav = e.target.closest(".nav button");
-  if (nav) { S.tab = nav.dataset.tab; render(); return; }
+  if (nav) { S.tab = nav.dataset.tab; S.limit = 120; render(); if (S.tab === "list" && S.list.length && !S.ranking && !S.busy) rank(); return; }
   const act = e.target.closest("[data-act]");
   if (!act) return;
   const [cmd, arg] = act.dataset.act.split(/:(.*)/);
-  if (cmd === "st") { S.store = arg || null; S.more = false; S.cat = null; }
+  if (cmd === "st") { S.store = arg || null; S.more = false; S.cat = null; S.limit = 120; }
   if (cmd === "more") S.more = !S.more;
-  if (cmd === "unit") S.byUnit = !S.byUnit;
+  if (cmd === "unit") { S.byUnit = !S.byUnit; S.limit = 120; }
   if (cmd === "near") { toggleNear(); return; }
   if (cmd === "nodigest") S.digestGone = true;
-  if (cmd === "cat") S.cat = S.cat === arg ? null : arg;
+  if (cmd === "limit") S.limit += 240;
+  if (cmd === "cat") { S.cat = S.cat === arg ? null : arg; S.limit = 120; }
   if (cmd === "add") { addItem(); return; }
+  if (cmd === "quick") { addItem(arg); return; }
+  if (cmd === "week") {
+    for (const w of QUICK_ITEMS.slice(0, 8))
+      if (!S.list.some(x => x.toLowerCase() === w.toLowerCase())) S.list.push(w);
+    listChanged(); return;
+  }
   if (cmd === "rank") { rank(); return; }
   if (cmd === "chain") S.chosen = arg;
-  if (cmd === "del") { S.list = S.list.filter(x => x !== arg); S.checked.delete(arg); S.ranking = null; saveList(); }
+  if (cmd === "del") {
+    S.list = S.list.filter(x => x !== arg); S.checked.delete(arg);
+    listChanged(); return;
+  }
+  if (cmd === "uncheck") { S.checked.clear(); saveList(); }
+  if (cmd === "showall") { S.hidden.clear(); saveHidden(); }
   if (cmd === "chk") { S.checked.has(arg) ? S.checked.delete(arg) : S.checked.add(arg); saveList(); }
   render();
+});
+
+/* Клавиатура: Escape затваря детайла, Enter/интервал натиска редовете с
+   role="button" (те са <div>, значи браузърът не го прави сам). */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("modal").classList.contains("open")) {
+    closeDetail(); return;
+  }
+  if ((e.key === "Enter" || e.key === " ") && e.target.getAttribute
+      && e.target.getAttribute("role") === "button") {
+    e.preventDefault(); e.target.click();
+  }
+});
+/* Системният бутон „назад“ на Android: първо се връща в детайла, после
+   го затваря — вместо да излиза от приложението. */
+window.addEventListener("popstate", () => {
+  if (!$("modal").classList.contains("open")) return;
+  S.histPushed = false;
+  const prev = S.detailStack.pop();
+  if (prev) { openDetail(prev, false); history.pushState({ pr: "detail" }, ""); S.histPushed = true; }
+  else closeDetail(true);
 });
 
 boot();

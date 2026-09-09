@@ -167,26 +167,24 @@ def collapse_currency(prices, curs=None, pct=None):
 
     # Ако на плочката пише намаление около 49%, то може и да е истинско —
     # тогава не пипаме нищо, за да не изтрием реална стара цена.
-    if pct and 46 <= pct <= 52:
-        return list(prices)
-
-    pairs = list(zip(prices, curs))
+    pairs = [(v, c.lower()) for v, c in zip(prices, curs) if v > 0]
     kept = []
     for v, c in pairs:
-        if v <= 0:
-            continue
-        twin = any(o > v and abs(o / v - EUR_RATE) < 0.02 * EUR_RATE
-                   for o, _ in pairs)
-        if twin and c != "bgn":
-            continue          # v е същата цена, но в евро — махаме я
-        kept.append((v, c))
-
-    if not kept:
-        return list(prices)
-    # Ако накрая всичко е в евро, превръщаме в лева
-    if all(c == "eur" for _, c in kept):
-        return [round(v * EUR_RATE, 2) for v, _ in kept]
-    return [v for v, _ in kept]
+        # Explicit currency always wins, including genuine 49–52% discounts.
+        if c == "eur":
+            normalized = round(v * EUR_RATE, 2)
+        else:
+            # Only infer dual display when the currency is unknown AND no
+            # genuine near-half-price discount has been declared.
+            twin = not (pct and 46 <= pct <= 52) and c == "" and any(
+                o > v and oc != "eur" and abs(o / v - EUR_RATE) < 0.02 * EUR_RATE
+                for o, oc in pairs)
+            if twin:
+                continue
+            normalized = round(v, 2)
+        if not any(abs(normalized - old) <= 0.02 for old in kept):
+            kept.append(normalized)
+    return kept
 
 
 def pick_price_pair(prices, pct=None):
@@ -237,6 +235,10 @@ def enrich(item):
     хваща случая независимо как магазинът я е изписал.
     """
     name = item.get("name") or item.get("product", "")
+    item["currency"] = "BGN"  # storage contract; clients display EUR
+    item["requiresCard"] = bool(re.search(r"card|xtra|plus|купон|с карта", name, re.I))
+    item.setdefault("validFrom", None)
+    item.setdefault("validTo", None)
     up = unit_price(item.get("price"), name)
     if up:
         item["unitPrice"], item["unitLabel"] = up
@@ -254,6 +256,14 @@ def enrich(item):
 
 # Заглавия, които идват от рекламни рубрики, а не от стока. Улавят се тук,
 # а не в JavaScript, защото същият текст стига и по други пътища.
+# Закотвен е в НАЧАЛОТО нарочно — иначе „Сок с малини“ би отпаднал заради
+# думата „малини“ някъде в средата. Но Лидл слага периода отпред:
+# „от 10.08. до 16.08. Седмични предложения“ — и закотвянето пропускаше
+# точно тези. Затова датата се прескача преди проверката.
+_DATE_PREFIX_RE = re.compile(
+    r"^\s*(от\s+)?\d{1,2}[./]\d{1,2}\.?\s*(до\s+\d{1,2}[./]\d{1,2}\.?)?\s*",
+    re.IGNORECASE)
+
 JUNK_NAME_RE = re.compile(
     r"^\s*(тествай(те)?\b"
     r"|печеливш(и|ите)?\s+участниц"
@@ -338,6 +348,11 @@ _GLUED_SUFFIX = [
 _TRAILING_UNIT = re.compile(r"(?<![\d,.])\s+(кг|гр|гр\.|г|мл|л|бр|бр\.)\s*$",
                             re.IGNORECASE)
 
+# „Кайма смес ЗА 2.29“ — Лидл слага цената в името. Иска се точно две
+# цифри след разделителя, за да не отреже „Сос за 4 порции“.
+_PRICE_TAIL = re.compile(r"\s+за\s+\d{1,3}[.,]\d{2}\s*(лв\.?|€)?\s*$",
+                         re.IGNORECASE)
+
 
 def _split_glued_word(w):
     """Отделя залепена наставка от една дума. „витринакг“ → „витрина кг“."""
@@ -383,6 +398,10 @@ def clean_name(name):
         s = rx.sub("", s)
     # Гола единица накрая
     s = _TRAILING_UNIT.sub("", s)
+    # Цената, залепена за името: Лидл пише „Кайма смес за 2.29“. Цената
+    # вече я има в собствено поле, а в името тя разваля и търсенето, и
+    # сравнението („2.29“ не е част от стоката).
+    s = _PRICE_TAIL.sub("", s)
 
     out = re.sub(r"\s+", " ", s).strip(" -–—·,")
     # Предпазител: ако правилата са изяли смисъла, връщаме оригинала.
@@ -404,6 +423,9 @@ def is_junk_offer(o):
     if len(name) < 3:
         return True
     if JUNK_NAME_RE.search(name) or UNIT_AS_NAME_RE.search(name):
+        return True
+    # Същата проверка, но след като периодът отпред е прескочен.
+    if JUNK_NAME_RE.search(_DATE_PREFIX_RE.sub("", name)):
         return True
     # само главни букви и препинателни знаци, без нито една буква — не е име
     if not re.search(r"[A-Za-zА-Яа-я]{3}", name):
@@ -1845,8 +1867,22 @@ def scrape_reports():
 # невиждани от HISTORY_KEEP_DAYS дни, изпадат; точките се режат до
 # HISTORY_MAX_POINTS на продукт.
 
-HISTORY_MAX_POINTS = 40
+# Досега тук влизаха САМО промоционалните оферти — тоест 4 вериги от 79.
+# Графиката „История на цената“ работеше за 9% от каталога, а за
+# останалите 91% приложението мълчеше. Официалните цени на КЗП се
+# публикуват ВСЕКИ ДЕН и вече ги теглим — просто не ги пазехме.
+#
+# Точно тези 91% са и по-интересната история: промоцията трае седмица, а
+# редовната цена на хляба през последните два месеца отговаря на въпроса
+# „поскъпва ли наистина“.
+#
+# Цената на цял ред трябва да е измерима, затова има таван по БРОЙ ТОЧКИ
+# и по размер на файла. Официалните цени се менят рядко, значи повечето
+# продукти ще имат 2-5 точки.
+HISTORY_MAX_POINTS = 40          # за промоциите: менят се често
+HISTORY_MAX_POINTS_BASIC = 24    # за официалните: по-рядко, но много редове
 HISTORY_KEEP_DAYS = 60
+HISTORY_MAX_MB = 6               # таван на суровия файл; над него режем точки
 
 
 def _hist_key(store, name):
@@ -1860,41 +1896,80 @@ def build_history():
         "https://raw.githubusercontent.com/valerimilanov1990-max/promoradar-data"
     ).rstrip("/")
 
-    prev = {}
+    prev = None
     for br in ("data", "main"):
         try:
             r = requests.get(f"{base}/{br}/feed/history.json",
                              headers=UA, timeout=30)
             if r.status_code == 200 and r.content:
-                prev = json.loads(r.text).get("h", {})
-                break
+                candidate = json.loads(r.text).get("h")
+                if isinstance(candidate, dict) and candidate:
+                    prev = candidate
+                    break
         except Exception:
             continue
+
+    if prev is None:
+        # A failed download is not an empty history. Refuse publication.
+        raise RuntimeError("Previous price history unavailable; preserving published snapshot")
 
     today = datetime.date.today().isoformat()
     h = dict(prev)
     changed = 0
-    for o in OUT["offers"]:
-        k = _hist_key(o["store"], o["name"])
+
+    def add(store, name, price, cap):
+        nonlocal changed
+        try:
+            price = round(float(price), 2)
+        except (TypeError, ValueError):
+            return
+        if not (0 < price < 100000):
+            return
+        k = _hist_key(store, name)
         e = h.get(k) or {"d": [], "p": [], "l": today}
-        price = round(float(o["price"]), 2)
+        # Точка само при ПРОМЯНА (плюс първия запис) — иначе файлът расте
+        # с 30 000 реда дневно, без да казва нищо ново.
         if not e["p"] or abs(e["p"][-1] - price) > 0.005:
             e["d"].append(today)
             e["p"].append(price)
             changed += 1
         e["l"] = today
-        e["d"] = e["d"][-HISTORY_MAX_POINTS:]
-        e["p"] = e["p"][-HISTORY_MAX_POINTS:]
+        e["d"] = e["d"][-cap:]
+        e["p"] = e["p"][-cap:]
         h[k] = e
+
+    for o in OUT["offers"]:
+        add(o["store"], o["name"], o.get("price"), HISTORY_MAX_POINTS)
+    # НОВОТО: официалните цени на КЗП — 75-те вериги, за които досега
+    # нямаше нито една точка.
+    for b in OUT["basics"]:
+        add(b["chain"], b["product"], b.get("price"), HISTORY_MAX_POINTS_BASIC)
 
     # чистене: продукти, които никой не е виждал отдавна
     cutoff = (datetime.date.today()
               - datetime.timedelta(days=HISTORY_KEEP_DAYS)).isoformat()
     h = {k: v for k, v in h.items() if v.get("l", "") >= cutoff}
 
+    # Таван по размер. Ако файлът мине лимита, се режат ТОЧКИ (най-старите
+    # първо), не продукти — по-добре по-къса крива за всички, отколкото
+    # липсваща крива за половината.
+    size = len(json.dumps(h, ensure_ascii=False).encode("utf-8"))
+    trims = 0
+    while size > HISTORY_MAX_MB * 1024 * 1024 and trims < 12:
+        cap = max(4, HISTORY_MAX_POINTS_BASIC - 4 * (trims + 1))
+        for e in h.values():
+            if len(e["p"]) > cap:
+                e["d"] = e["d"][-cap:]
+                e["p"] = e["p"][-cap:]
+        trims += 1
+        size = len(json.dumps(h, ensure_ascii=False).encode("utf-8"))
+
     OUT["history"] = h
-    OUT["stats"]["история"] = (f"{len(h)} продукта, {changed} нови точки, "
-                               f"наследени {len(prev)}")
+    with_curve = sum(1 for e in h.values() if len(e["p"]) >= 2)
+    OUT["stats"]["история"] = (
+        f"{len(h)} продукта ({with_curve} с крива от 2+ точки), "
+        f"{changed} нови точки, наследени {len(prev)}, "
+        f"{size // 1024} KB" + (f", подрязано {trims} пъти" if trims else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -2044,12 +2119,20 @@ def _labels_prev():
     if not base:
         return {}
     for br in ("data", "main"):
-        try:
-            r = requests.get(f"{base}/{br}/feed/labels.json", timeout=30)
-            if r.ok:
-                return r.json().get("l", {})
-        except Exception:
-            pass
+        # labels-cache.json носи ВСИЧКИ видени имена, включително изчезналите
+        # от фийда. Той е кешът, който пази парите за AI. Публикуваният
+        # labels.json е изрязан до живите имена и се тегли от телефоните —
+        # ако четяхме него, всеки изчезнал и върнал се продукт щеше да се
+        # плаща наново.
+        for path in ("feed/labels-cache.json", "feed/labels.json"):
+            try:
+                r = requests.get(f"{base}/{br}/{path}", timeout=60)
+                if r.ok:
+                    got = r.json().get("l", {})
+                    if got:
+                        return got
+            except Exception:
+                pass
     return {}
 
 def _ai_batch(names, key, model):
@@ -2077,7 +2160,19 @@ def _ai_batch(names, key, model):
         "уиски, водка, ликьор, аперитив, пенливо, напитка на винена основа), "
         "иначе 0. Безалкохолна бира и вино 0,0% са a=0. "
         "Категорията е ЕДНА от: " + " ".join(AI_CATS) +
-        ". Марката е с малки букви, както е в името, или \"\" ако няма. Типът е "
+        ". Марката е с малки букви, както е в името, или \"\" ако няма. "
+        # Търсенето стъпва на това разделение. Когато марката попадне в
+        # типа, „орехи“ намира ШПЕК: „ОРЕХИТЕ ШПЕК БУРГАС“ получи тип
+        # „шпек орехите“ и марка „бургас“ — разменени. От 80 реда с
+        # „орех“ в името само 2 са истински орехи; останалите са колбаси
+        # на марка „Орехите“ и заради този етикет излизаха при заявка за
+        # ядки.
+        "ВАЖНО: типът НЕ трябва да съдържа марката. „ОРЕХИТЕ ШПЕК БУРГАС“ "
+        "дава t=\"шпек\", b=\"орехите\" — НЕ t=\"шпек орехите\". "
+        "„МЕДИКС ВЕРО КЛАСИК ЛИМОН“ дава t=\"препарат за съдове\", "
+        "b=\"медикс\" — НЕ t=\"медикс класик лимон\". "
+        "Ако марката е първата дума в името, тя пак отива в b, не в t. "
+        "Типът е "
         "кратък (2-4 думи, малки букви) и описва КАКВО Е продуктът, не опаковката: "
         "„празен буркан“ е „буркан за консервиране“ (teh), „БОБ БУРКАН“ е „боб“ "
         "(bakal); паста за зъби с вкус ягода е higi, не плод; цигарите са tut. "
@@ -2278,21 +2373,45 @@ def enrich_ai():
 # редовете, които още нямат. Така подредбата „за единица“ и сравнението
 # на опаковки покриват почти всичко.
 
-_AI_Q_RE = re.compile(r"^(\d+(?:[.,]\d+)?)\s*(г|мл|бр)$")
+# Мерките се пишат и на латиница, и в едри единици. Само „г|мл|бр“
+# изхвърляше 799 етикета — латинско „g“ и „ml“ (459+225), килограми,
+# литри, милиграми. Измерено: 162 реда получават цена за единица само от
+# това разширение.
+# Милиграмите НАРОЧНО не са тук: „200 mg“ е доза на лекарство, не
+# разфасовка. Цена „4950 лв/кг“ за таблетки е вярна аритметика и напълно
+# безполезна на екрана — по-добре нищо.
+_AI_Q_RE = re.compile(
+    r"^(\d+(?:[.,]\d+)?)\s*(г|g|гр|мл|ml|mл|кг|kg|л|l|бр|br|bр|шт)$",
+    re.IGNORECASE)
+
+# колко от базовата единица (кг / л / бр) е един запис
+_Q_FACTOR = {
+    "г": 0.001, "g": 0.001, "гр": 0.001,
+    "кг": 1.0, "kg": 1.0,
+    "мл": 0.001, "ml": 0.001, "mл": 0.001, "л": 1.0, "l": 1.0,
+    "бр": 1.0, "br": 1.0, "bр": 1.0, "шт": 1.0,
+}
+_Q_LABEL = {
+    "г": "кг", "g": "кг", "гр": "кг", "кг": "кг", "kg": "кг",
+    "мл": "л", "ml": "л", "mл": "л", "л": "л", "l": "л",
+    "бр": "бр", "br": "бр", "bр": "бр", "шт": "бр",
+}
 
 def _unit_from_q(price, q):
     m = _AI_Q_RE.match(q.strip())
     if not m or price <= 0:
         return None
     v = float(m.group(1).replace(",", "."))
-    if v <= 0:
+    unit = m.group(2).lower()
+    amount = v * _Q_FACTOR.get(unit, 0)
+    if amount <= 0:
         return None
-    unit = m.group(2)
-    if unit == "г":
-        return round(price / (v / 1000.0), 2), "лв/кг"
-    if unit == "мл":
-        return round(price / (v / 1000.0), 2), "лв/л"
-    return round(price / v, 2), "лв/бр"
+    up = price / amount
+    # Същият предпазител като в unit_price: безсмислено число значи
+    # сгрешена мярка, а не евтина стока.
+    if not (0 < up < 10000):
+        return None
+    return round(up + 1e-9, 2), "лв/" + _Q_LABEL.get(unit, "бр")
 
 def apply_ai_quantities():
     labels = OUT.get("labels") or {}
@@ -2497,10 +2616,31 @@ def write_output():
                                  "text": OUT["digest"]})
 
     # --- AI етикетите (категория/марка/тип за всяко име) ---
+    #
+    # Публикува се САМО каквото се вижда днес. Измерено: 30% от етикетите
+    # (11 213 от 37 717) са за имена, които вече ги няма във фийда — стари
+    # промоции, изчезнали артикули. Приложението ги тегли всеки път и
+    # никога не ги пита. Изрязването сваля файла от 916 на ~640 KB, тоест
+    # първото зареждане пада с 17%.
+    #
+    # ВАЖНО: пълният списък остава в data.json и се тегли обратно при
+    # следващото пускане (виж enrich_ai). Ако изчезналият продукт се върне,
+    # етикетът му е там и НЕ се плаща наново на AI.
     if OUT.get("labels"):
+        live = {_lab_key(o["name"]) for o in OUT["offers"]}
+        live |= {_lab_key(b["product"]) for b in OUT["basics"]}
+        live |= {_lab_key(c["product"]) for c in OUT["community"]}
+        pub = {k: v for k, v in OUT["labels"].items() if k in live}
         sizes["labels"] = _dump("feed/labels.json",
-                                {"updated": OUT["updated"],
-                                 "l": OUT["labels"]})
+                                {"updated": OUT["updated"], "l": pub})
+        # Пълният списък — само за следващото пускане на скрейпъра.
+        # Телефоните никога не го теглят.
+        sizes["labels-cache"] = _dump("feed/labels-cache.json",
+                                      {"updated": OUT["updated"],
+                                       "l": OUT["labels"]})
+        OUT["stats"]["етикети"] = (
+            f"{len(OUT['labels'])} в кеша, {len(pub)} публикувани "
+            f"({len(OUT['labels']) - len(pub)} за изчезнали продукти)")
 
     # --- локациите на магазините (за „вериги наблизо“) ---
     if OUT.get("geo"):
@@ -2513,7 +2653,11 @@ def write_output():
     for o in OUT["offers"]:
         idx.append({"s": o["store"], "n": o["name"], "p": o["price"],
                     "o": o.get("old"), "u": o.get("unitPrice"),
-                    "l": o.get("unitLabel", ""), "f": 0})
+                    "l": o.get("unitLabel", ""), "f": 0,
+                    "currency": "BGN", "qty": o.get("qty"),
+                    "qtyUnit": o.get("qtyUnit", ""),
+                    "requiresCard": o.get("requiresCard"),
+                    "validFrom": o.get("validFrom"), "validTo": o.get("validTo")})
     for b in OUT["basics"]:
         idx.append({"s": b["chain"], "n": b["product"], "p": b["price"],
                     "o": None, "u": b.get("unitPrice"),

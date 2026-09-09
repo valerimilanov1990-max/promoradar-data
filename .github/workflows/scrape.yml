@@ -4,7 +4,16 @@ on:
   schedule:
     - cron: "0 4 * * *"    # 07:00 БГ — прясната сутрешна брошура
     - cron: "0 11 * * *"   # 14:00 БГ — втора точка за историята на цените
-  workflow_dispatch: {}      # + ръчно пускане от бутона Run workflow
+  workflow_dispatch:
+    inputs:
+      enable_ai:
+        description: 'Use paid AI labeling (off for manual validation)'
+        type: boolean
+        default: false
+      publish:
+        description: 'Publish only after all quality gates pass'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -21,6 +30,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Preserve previous coverage baseline
+        run: |
+          mkdir -p "$RUNNER_TEMP/feed-baseline/feed"
+          git fetch --depth=1 origin data
+          echo "DATA_BASELINE_SHA=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          git show FETCH_HEAD:feed/index.json > "$RUNNER_TEMP/feed-baseline/feed/index.json"
+          git show FETCH_HEAD:feed/history.json > "$RUNNER_TEMP/feed-baseline/feed/history.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -35,8 +56,23 @@ jobs:
         env:
           # AI етикетите: ключът живее САМО в GitHub Secrets. Без него
           # стъпката се прескача и правилата поемат всичко.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ (github.event_name == 'schedule' || inputs.enable_ai) && secrets.ANTHROPIC_API_KEY || '' }}
         run: python scraper.py
+
+      - name: Regression tests and publication gates
+        run: |
+          python -m unittest test_pipeline.py
+          node test-web.js --contract-only
+          python validate_feed.py . "$RUNNER_TEMP/feed-baseline"
+
+      - name: Keep validated recovery snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-feed-${{ github.run_id }}
+          retention-days: 14
+          path: |
+            data.json
+            feed/
 
       # ------------------------------------------------------------------
       # Данните отиват в ОТДЕЛЕН клон "data" с история от един-единствен
@@ -45,12 +81,12 @@ jobs:
       # Тук всяко пускане презаписва клона наново и хранилището остава малко.
       # ------------------------------------------------------------------
       - name: Publish data branch
+        if: github.event_name == 'schedule' || inputs.publish
         run: |
           set -e
           test -f data.json || { echo "няма data.json — скрейпърът се провали"; exit 1; }
 
-          PUB="$RUNNER_TEMP/pub"
-          rm -rf "$PUB" && mkdir -p "$PUB"
+          PUB=$(mktemp -d "$RUNNER_TEMP/promoradar-publish.XXXXXX")
           cp data.json "$PUB"/
           cp -r feed "$PUB"/ 2>/dev/null || true
 
@@ -62,7 +98,7 @@ jobs:
           git commit -q -m "data $(date -u '+%Y-%m-%d %H:%M UTC')"
           git remote add origin \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          git push -f -q origin data
+          git push --force-with-lease="refs/heads/data:$DATA_BASELINE_SHA" -q origin data
 
           echo "Публикувано в клон data:"
           ls -lh data.json feed/ 2>/dev/null || true

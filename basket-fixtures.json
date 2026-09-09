@@ -1,0 +1,65 @@
+[
+  {
+    "name": "one kilogram",
+    "price": 4,
+    "unitPrice": 4,
+    "unit": "кг",
+    "quantity": 1,
+    "packs": 1,
+    "totalEur": 2.05
+  },
+  {
+    "name": "two half-kilo packs",
+    "price": 2.5,
+    "unitPrice": 5,
+    "unit": "кг",
+    "quantity": 1,
+    "packs": 2,
+    "totalEur": 2.56
+  },
+  {
+    "name": "six eggs need two packs",
+    "price": 3,
+    "unitPrice": 0.5,
+    "unit": "бр",
+    "quantity": 10,
+    "packs": 2,
+    "totalEur": 3.06
+  },
+  {
+    "name": "200ml need five packs",
+    "price": 0.79,
+    "unitPrice": 3.95,
+    "unit": "л",
+    "quantity": 1,
+    "packs": 5,
+    "totalEur": 2
+  },
+  {
+    "name": "rounded unit price",
+    "price": 1.99,
+    "unitPrice": 4.98,
+    "unit": "кг",
+    "quantity": 0.4,
+    "packs": 1,
+    "totalEur": 1.02
+  },
+  {
+    "name": "do not underbuy",
+    "price": 2,
+    "unitPrice": 4,
+    "unit": "кг",
+    "quantity": 0.51,
+    "packs": 2,
+    "totalEur": 2.04
+  },
+  {
+    "name": "displayed EUR cents multiply exactly",
+    "price": 1.12,
+    "unitPrice": 1.12,
+    "unit": "л",
+    "quantity": 3,
+    "packs": 3,
+    "totalEur": 1.71
+  }
+]
