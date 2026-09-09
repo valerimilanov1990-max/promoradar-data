@@ -429,8 +429,7 @@ const SCENT = new Set(["аромат","вкус","мирис"]);
 
 const SRC_LABEL = { 1: "официална", 2: "от магазина" };
 
-const isFar = chain => S.nearOnly && S.geoKm
-  && S.geoKm[chain] != null && S.geoKm[chain] > NEAR_RADIUS;
+const isFar = chain => S.nearOnly && !withinRadius(chain, S.geoKm, S.nearRadius);
 
 /* ---------- какво точно е съвпаднало ----------
    „Орехи“ намираше „ШПЕК КЛАСИК ОРЕХИТЕ“, защото „Орехите“ е МАРКА
@@ -1221,6 +1220,8 @@ const S = {
   detailStack: [], lastRef: null, histPushed: false,
   hidden: new Set(readArr("pr_hidden")),
   theme: readStr("pr_theme", "auto"),
+  nearOnly: false, geoKm: null, geoBusy: false, geoError: "", basketSort: "price",
+  nearRadius: [5,10,20,50].includes(Number(readStr("pr_radius", "10"))) ? Number(readStr("pr_radius", "10")) : 10,
 };
 const saveHidden = () => write("pr_hidden", JSON.stringify([...S.hidden]));
 /* Ръчна тема. Без нея важи само prefers-color-scheme, а хората често
@@ -1439,6 +1440,7 @@ function viewToday() {
 
   let head = `${q.length < 2 ? '<div class="home-intro"><span>ПАЗАРУВАЙ С ЯСНА СМЕТКА</span><h2>Добрите покупки<br>започват оттук.</h2><button class="home-list" data-tab="list">' + (S.list.length ? "Твоята кошница · " + S.list.length + " продукта" : "Създай твоята кошница") + ' <span aria-hidden="true">↗</span></button></div>' : ""}<div class="search"><input id="q" type="search" aria-label="Търси във всички магазини" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
 
+  if (S.nearOnly) head += nearbyControls();
   if (q.length >= 2) {
     if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
     // Подсказките стоят НАД резултатите, а не вместо тях: пишеш и виждаш
@@ -1458,10 +1460,9 @@ function viewToday() {
   }
 
   // „Наблизо“: разстояние до най-близкия магазин на всяка верига;
-  // веригите извън радиуса изчезват от лентата. Без данни в OSM = остава.
-  const far = c => S.hidden.has(c)
-    || (S.nearOnly && S.geoKm && S.geoKm[c] != null && S.geoKm[c] > NEAR_RADIUS);
-  const kmTag = c => (S.geoKm && S.geoKm[c] != null && S.geoKm[c] <= NEAR_RADIUS)
+  // Unknown coordinates must never qualify as nearby.
+  const far = c => S.hidden.has(c) || isFar(c);
+  const kmTag = c => (S.geoKm && S.geoKm[c] != null && S.geoKm[c] <= S.nearRadius)
     ? " · " + fmtKm(S.geoKm[c]) : "";
 
   const digestHtml = (S.digest && !S.digestGone)
@@ -1596,32 +1597,59 @@ function viewMore() {
 }
 
 /* ---------- наблизо ---------- */
-const NEAR_RADIUS = 20; // км
+function withinRadius(chain, km, radius) {
+  const d = km?.[chain];
+  return Number.isFinite(d) && d >= 0 && d <= radius;
+}
+function sortBaskets(rows, km, sort) {
+  return [...rows].sort((a,b) => b[2] - a[2] ||
+    (sort === "distance" ? (km?.[a[0]] ?? Infinity) - (km?.[b[0]] ?? Infinity) : a[1] - b[1]) ||
+    a[1] - b[1] || a[0].localeCompare(b[0], "bg"));
+}
+function validPoint(la, lo) {
+  return Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180;
+}
 const fmtKm = km => km < 1 ? "под 1 км" : km < 10 ? km.toFixed(1) + " км" : Math.round(km) + " км";
 function haversineKm(la1, lo1, la2, lo2) {
   const r = Math.PI / 180, dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
   const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
-  return 2 * 6371 * Math.asin(Math.sqrt(a));
+  return 2 * 6371 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, a))));
 }
-async function toggleNear() {
-  if (S.nearOnly) { S.nearOnly = false; render(); return; }
-  if (!navigator.geolocation) { console.warn("няма геолокация"); return; }
-  navigator.geolocation.getCurrentPosition(async pos => {
-    try {
-      const g = S.geoFeed || (S.geoFeed = await feed("feed/stores-geo.json"));
-      const { latitude: la, longitude: lo } = pos.coords;
-      const km = {};
-      for (const [chain, pts] of Object.entries(g.chains || {})) {
-        let best = Infinity;
-        for (const p of pts) best = Math.min(best, haversineKm(la, lo, p[0], p[1]));
-        if (best < Infinity) km[chain] = best;
-      }
-      S.geoKm = km; S.nearOnly = true;
-    } catch (e) {
-      S.geoKm = null;
+let geoVersion = 0;
+async function locateNearby() {
+  const version = ++geoVersion;
+  S.geoBusy = true; S.geoError = ""; S.geoKm = null; listChanged();
+  try {
+    if (!navigator.geolocation) throw new Error("Браузърът няма достъп до местоположение.");
+    const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve,
+      e => reject(new Error(e.code === 1 ? "Достъпът до местоположение е отказан. Разреши го от настройките на сайта или избери всички магазини." : "Не успях да определя позицията. Включи местоположението и опитай отново.")),
+      {maximumAge:60000, timeout:15000, enableHighAccuracy:false}));
+    const g = S.geoFeed || (S.geoFeed = await feed("feed/stores-geo.json"));
+    const {latitude:la, longitude:lo} = pos.coords;
+    if (!g?.chains || !validPoint(la,lo)) throw new Error("Координатите на магазините не са достъпни. Опитай отново онлайн.");
+    const km = {};
+    for (const [chain, pts] of Object.entries(g.chains)) {
+      const distances = pts.filter(p => validPoint(p[0],p[1])).map(p => haversineKm(la,lo,p[0],p[1]));
+      if (distances.length) km[chain] = Math.min(...distances);
     }
-    render();
-  }, () => render(), { maximumAge: 600000, timeout: 8000 });
+    if (!Object.keys(km).length) throw new Error("Няма известни координати на магазини.");
+    if (version === geoVersion) S.geoKm = km;
+  } catch (e) { if (version === geoVersion) S.geoError = e.message; }
+  finally { if (version === geoVersion) { S.geoBusy = false; listChanged(); } }
+}
+function toggleNear() {
+  S.nearOnly = !S.nearOnly;
+  if (S.nearOnly) locateNearby();
+  else { geoVersion++; S.geoBusy = false; S.geoError = ""; if (!S.geoKm) S.basketSort = "price"; listChanged(); }
+}
+function nearbyControls() {
+  return `<div class="panel"><b>Магазини около теб</b><div class="chips" style="margin-top:8px">${chip(S.nearOnly ? "📍 Само наблизо ✓" : "📍 Само наблизо", S.nearOnly, "near:")}</div>
+    ${S.nearOnly ? `<div class="chips">${[5,10,20,50].map(r => `<button class="chip" aria-pressed="${S.nearRadius === r}" data-radius="${r}" style="${S.nearRadius === r ? "background:var(--mint);color:var(--mintfg)" : ""}">${r} км</button>`).join("")}</div>` : ""}
+    <div class="chips">${["price","distance"].map(s => `<button class="chip" aria-pressed="${S.basketSort === s}" data-basketsort="${s}">${s === "price" ? "По цена" : "По близост"}${S.basketSort === s ? " ✓" : ""}</button>`).join("")}</div>
+    <div class="note">Пълните кошници са първи. ${S.nearOnly || S.basketSort === "distance" ? "Приблизително по права линия до най-близкия известен обект. Цената е за веригата, не е потвърдена за този обект. Без изпращане на позицията към Промо Радар." : "Включи „Само наблизо“, за да ограничиш радиуса."}</div>
+    ${S.geoBusy ? '<div role="status">Определям местоположението…</div>' : ""}
+    ${S.geoError ? `<div role="alert">${esc(S.geoError)}</div>` : ""}
+    ${(S.nearOnly || S.basketSort === "distance") && !S.geoBusy ? '<button class="chip" data-locate>Обнови местоположението</button>' : ""}</div>`;
 }
 
 /* ---------- кошницата ----------
@@ -1635,7 +1663,7 @@ const QUICK_ITEMS = ["прясно мляко", "кисело мляко", "хл
 
 function viewList() {
   const items = S.list;
-  let html = `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
+  let html = nearbyControls() + `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
   <div class="addrow"><input id="newitem" aria-label="Добави продукт в списъка" placeholder="напр. „мляко“, „яйца“, „кайма“" value="${esc(S.nq || "")}"><button data-act="add:">Добави</button></div>`;
 
   // Подсказки, докато пишеш — същото преживяване като търсенето в Днес:
@@ -1665,6 +1693,8 @@ function viewList() {
      <button class="big" data-act="week:">Добави типична седмична кошница</button>`;
 
   html += `<button class="big" data-act="rank:">🧮 Къде е най-евтино?</button>`;
+  if (S.ranking && !S.ranking.length && S.nearOnly && !S.geoBusy && !S.geoError)
+    html += `<div class="note">Няма сравними цени от известни обекти до ${S.nearRadius} км. Увеличи радиуса или изключи „Само наблизо“. Магазини без координати и онлайн магазини са изключени.</div>`;
 
   if (S.ranking && S.ranking.length) {
     const full = S.ranking.filter(r => r[2] === items.length);
@@ -1684,25 +1714,25 @@ function viewList() {
     const what = "за нужните опаковки според зададените количества";
     const mixed = " Марките може да се различават. Разпознатите оферти с карта и неизвестните количества са изключени.";
     html += `<div class="panel">
-      <b>Къде излиза най-евтино</b>
+      <b>${S.basketSort === "distance" ? "Магазините по близост" : "Къде излиза най-евтино"}</b>
       <div class="note" style="margin:4px 0 10px">Цените са ${what} — така магазините са сравними,
       само при еднакво пълно покритие.${mixed}
       Натисни верига, за да видиш нейните цени по артикулите.</div>
 
       <div class="win" role="button" tabindex="0" data-act="chain:${esc(best[0])}">
         <div style="flex:1;min-width:0">
-          <div class="winname" style="color:${storeColor(best[0])}">🥇 ${esc(best[0])}</div>
+          <div class="winname" style="color:${storeColor(best[0])}">${S.basketSort === "distance" ? "📍" : "🥇"} ${esc(best[0])}${S.geoKm?.[best[0]] != null ? " · ≈ " + fmtKm(S.geoKm[best[0]]) : ""}</div>
           <div class="mini">${best[2]} от ${items.length} артикула${
             save > 0.005 ? ` · <span style="color:var(--mint)">${eur(save)} € под медианата на пълните кошници</span>` : ""}</div>
         </div>
         <div class="winsum">${eur(best[1])} €</div>
       </div>`;
 
-    const rest = pool.slice(1, 6);
+    const rest = S.ranking.filter(r => r[0] !== best[0]);
     if (rest.length) html += rest.map(([chain, sum, cnt]) =>
       `<div class="rrow ${chain === S.chosen ? "sel" : ""}" role="button" tabindex="0" data-act="chain:${esc(chain)}">
-        <span style="color:${storeColor(chain)}">${esc(chain)}</span>
-        <span class="mini">${cnt < items.length ? cnt + " от " + items.length + " · " : ""}${cnt === items.length && best[2] === items.length ? "+" + eur(sum - best[1]) + " €" : "частична сума"}</span>
+        <span style="color:${storeColor(chain)}">${esc(chain)}${S.geoKm?.[chain] != null ? " · ≈ " + fmtKm(S.geoKm[chain]) : (S.basketSort === "distance" ? " · няма координати" : "")}</span>
+        <span class="mini">${cnt} от ${items.length}${cnt === items.length && best[2] === items.length ? " · " + (sum >= best[1] ? "+" : "") + eur(sum - best[1]) + " €" : " · частична сума"}</span>
         <b>${eur(sum)} €</b><span class="chev">›</span></div>`).join("");
     html += `<button class="chip" data-sharebasket style="margin-top:10px">📤 Сподели класацията</button></div>`;
   }
@@ -1799,6 +1829,7 @@ async function rank() {
   if (version === rankVersion) render();
 }
 function comparableRows(item) {
+  if ((S.nearOnly || S.basketSort === "distance") && (S.geoBusy || !S.geoKm)) return {rows:[], unit:true, label:basketAmount(item).unit};
   const amount = basketAmount(item);
   let rows = searchIn(S.search, item, 400, true).map(h => basketQuote(h, amount)).filter(Boolean);
   for (let pass = 0; pass < 3; pass++) {
@@ -1831,8 +1862,7 @@ async function rankInner(version) {
     }
   }
   S.perItem = per; S.mode = mode;
-  S.ranking = [...totals].map(([c, [s,n,p]]) => [c,s,n,p])
-    .sort((a,b) => b[2] - a[2] || a[1] - b[1]);
+  S.ranking = sortBaskets([...totals].map(([c, [s,n,p]]) => [c,s,n,p]), S.geoKm, S.basketSort);
   if (!S.ranking.some(r => r[0] === S.chosen)) S.chosen = S.ranking[0]?.[0] || null;
 }
 /* Сметката се преизчислява САМА при промяна на списъка. Досега оставаше
@@ -2303,6 +2333,12 @@ document.addEventListener("change", e => {
   S.amounts.set(item, amount); listChanged();
 });
 document.addEventListener("click", e => {
+  const radius = e.target.closest("[data-radius]");
+  if (radius) { const r = Number(radius.dataset.radius); if ([5,10,20,50].includes(r)) { S.nearRadius = r; write("pr_radius", String(r)); listChanged(); } return; }
+  const sort = e.target.closest("[data-basketsort]");
+  if (sort) { S.basketSort = sort.dataset.basketsort === "distance" ? "distance" : "price";
+    if (S.basketSort === "distance" && !S.geoKm) locateNearby(); else listChanged(); return; }
+  if (e.target.closest("[data-locate]")) { locateNearby(); return; }
   const open = e.target.closest("[data-open]");
   if (open) { openDetail(JSON.parse(open.dataset.open)); return; }
   if (e.target.closest("[data-back]")) {

@@ -17,7 +17,7 @@
 */
 "use strict";
 
-const VERSION = "v3.12.1-currency";
+const VERSION = "v3.13-nearby";
 const SHELL = "promoradar-shell-" + VERSION;
 const DATA = "promoradar-data-" + VERSION;
 const SHELL_FILES = ["./", "./index.html"];

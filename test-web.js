@@ -98,7 +98,8 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "labelFor", "typeOf", "esc", "safeUrl", "unitLbl", "matchScore",
   "render", "openDetail", "viewToday", "viewList", "viewMore",
   "iconOf", "GLYPH", "ICON_FOR", "thumb", "comparableRows",
-  "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe"];
+  "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe",
+  "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -139,6 +140,22 @@ ok("Два литра са две опаковки за 1.94 EUR", Math.abs(ctx.
 ok("Отхвърля стар официален кеш без маркер", !ctx.officialCurrencySafe({...milk,normalization:undefined,p:.97}));
 ok("Отхвърля двойно превалутиране и с наличен маркер", !ctx.officialCurrencySafe({...milk,p:.97}));
 ok("Корекцията не променя други източници", ctx.officialCurrencySafe({f:0,p:.97}));
+const km = {near:1, edge:10, far:10.01, invalid:NaN};
+ok("10 км включва границата", ctx.withinRadius("edge", km, 10));
+ok("Няма далечни или неизвестни магазини в радиуса", !ctx.withinRadius("far",km,10) && !ctx.withinRadius("unknown",km,10));
+ok("Без позиция не се показва всичко като наблизо", !ctx.withinRadius("near",null,10) && !ctx.withinRadius("invalid",km,10));
+ok("Координатите се валидират", ctx.validPoint(42.7,23.3) && !ctx.validPoint(200,23) && !ctx.validPoint(NaN,23));
+ok("Разстояние по права линия", Math.abs(ctx.haversineKm(0,0,1,0)-111.195)<.01);
+const baskets = [["cheap",10,2],["close",15,2],["partial",1,1],["unknown",20,2]];
+const distances = {cheap:8,close:1,partial:.1};
+ok("По цена, пълните кошници първи", ctx.sortBaskets(baskets,distances,"price").map(r=>r[0]).join() === "cheap,close,unknown,partial");
+ok("По близост, неизвестните последни сред пълните", ctx.sortBaskets(baskets,distances,"distance").map(r=>r[0]).join() === "close,cheap,unknown,partial");
+const savedGeo = {nearOnly:S.nearOnly,geoKm:S.geoKm,nearRadius:S.nearRadius,geoBusy:S.geoBusy,basketSort:S.basketSort};
+Object.assign(S,{nearOnly:true,geoKm:km,nearRadius:10,geoBusy:false});
+ok("Реалният филтър скрива неизвестни и далечни", ctx.isFar("unknown") && ctx.isFar("far") && !ctx.isFar("near"));
+S.geoKm = null;
+ok("Кошницата не връща стари цени при липсваща локация", ctx.comparableRows("мляко").rows.length === 0);
+Object.assign(S,savedGeo);
 }
 async function main() {
 if (process.argv.includes("--contract-only")) { contractTests(); console.log(pass+" passed; "+fail+" failed"); process.exit(fail ? 1 : 0); }
