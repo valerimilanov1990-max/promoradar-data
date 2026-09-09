@@ -1,6 +1,13 @@
 name: Scrape
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scraper.py'
+      - 'validate_feed.py'
+      - 'test_pipeline.py'
+      - '.github/workflows/scrape.yml'
   schedule:
     - cron: "0 4 * * *"    # 07:00 БГ — прясната сутрешна брошура
     - cron: "0 11 * * *"   # 14:00 БГ — втора точка за историята на цените
