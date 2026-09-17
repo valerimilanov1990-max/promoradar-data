@@ -54,6 +54,7 @@ const JS = HTML.match(/<script>\n([\s\S]*)\n<\/script>/)[1];
 
 /* ---------- пясъчник ---------- */
 const noop = () => {};
+const events = {};
 const fakeEl = () => ({
   innerHTML: "", value: "", textContent: "", scrollTop: 0,
   dataset: {}, classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
@@ -77,7 +78,7 @@ const ctx = {
     documentElement: { dataset: {} },
     getElementById: byId,
     querySelectorAll: () => [],
-    addEventListener: noop,
+    addEventListener: (type, handler) => { (events[type] ||= []).push(handler); },
   },
   window: { addEventListener: noop, devicePixelRatio: 1 },
   // fetch чете от диска — същите файлове, които сайтът тегли от GitHub
@@ -99,7 +100,8 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "render", "openDetail", "viewToday", "viewList", "viewMore",
   "iconOf", "GLYPH", "ICON_FOR", "thumb", "comparableRows",
   "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe",
-  "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar"];
+  "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar",
+  "PHOTO_ASSETS", "photoAsset", "indexedPhoto", "photoKey", "isAssortment"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -156,6 +158,37 @@ ok("Реалният филтър скрива неизвестни и дале�
 S.geoKm = null;
 ok("Кошницата не връща стари цени при липсваща локация", ctx.comparableRows("мляко").rows.length === 0);
 Object.assign(S,savedGeo);
+head("11. Снимки и обозначени илюстрации");
+ok("Мляното кафе не е месо", ctx.iconOf("Davidoff Мляно кафе различни видове").key === "coffee");
+ok("Мляното месо остава месо", ctx.iconOf("Мляно месо").key === "meat");
+ok("Непознат продукт има неутрална илюстрация", ctx.photoAsset("ZXQ неизвестен артикул") === "assets/product-photos/generic.jpg");
+for (const name of ctx.PHOTO_ASSETS) {
+  const file = path.join(__dirname, "assets/product-photos", name+".jpg");
+  const bytes = fs.readFileSync(file);
+  ok("Локален оптимизиран JPEG: "+name, bytes[0]===255 && bytes[1]===216 && bytes.length<60000);
+}
+const savedOffers = S.all;
+S.all = [{store:"Кауфланд", name:"Davidoff кафе 100 г", img:"https://example.com/coffee.jpg"}];
+ok("Точно име и верига намират снимката", ctx.indexedPhoto("Кауфланд", "Davidoff кафе 100 г") === S.all[0].img);
+ok("Не пренася снимка към друга разфасовка", !ctx.indexedPhoto("Кауфланд", "Davidoff кафе 200 г"));
+ok("Не пренася снимка към друга верига", !ctx.indexedPhoto("Лидл", "Davidoff кафе 100 г"));
+S.all = [...S.all, {...S.all[0],img:"https://example.com/other.jpg"}];
+ok("Двусмислените снимки не се преизползват", !ctx.indexedPhoto("Кауфланд", "Davidoff кафе 100 г"));
+S.all = savedOffers;
+const illustration = ctx.thumb("Кафе", "javascript:alert(1)",80);
+ok("Несигурен URL става обозначена илюстрация", illustration.includes('src="assets/product-photos/coffee.jpg"') && illustration.includes('>Илюстрация</small>') && !illustration.includes("javascript:"));
+ok("Асортиментът е обозначен като серия", ctx.thumb("Кафе различни видове","https://example.com/coffee.jpg",80).includes('>Серия</small>'));
+ok("Точната снимка няма етикет илюстрация", ctx.thumb("Кафе 100 г","https://example.com/coffee.jpg",80).includes('hidden'));
+const badge = {hidden:true,textContent:""};
+const wrapper = {querySelector:()=>badge,title:""};
+const failedImg = {tagName:"IMG",dataset:{photoFallback:"assets/product-photos/coffee.jpg",photoStage:"0"},
+  parentElement:wrapper,alt:"Кафе",src:"https://example.com/broken.jpg",remove(){this.removed=true;}};
+// Other isolated VMs in the full suite share the fake document. Test this VM's handler once.
+const failImage = () => events.error[0]({target:failedImg});
+failImage();
+ok("Счупен линк преминава към локална илюстрация", failedImg.src==="assets/product-photos/coffee.jpg" && badge.textContent==="Илюстрация" && !badge.hidden);
+failImage(); failImage();
+ok("Последната резерва не създава цикъл от грешки", failedImg.removed === true);
 }
 async function main() {
 if (process.argv.includes("--contract-only")) { contractTests(); console.log(pass+" passed; "+fail+" failed"); process.exit(fail ? 1 : 0); }

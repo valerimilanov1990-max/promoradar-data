@@ -265,13 +265,18 @@ main{padding:8px 20px 20px}.home-intro{margin:2px 0 14px}.home-intro>span{font-s
 .store-filter{border-bottom:1px solid var(--line)}.store-filter[open] summary:after{content:"−"}
 .chip,.cat{border-radius:8px;font-weight:500}.cat{background:transparent;border-color:transparent;min-height:44px;flex-direction:row;gap:5px}.cat u{display:none}.cat span{font-size:14px}
 .card{border:0;border-bottom:1px solid var(--line);border-radius:8px;padding:15px 12px;gap:12px;box-shadow:none;flex-wrap:wrap}
-.card>.th{width:60px!important;height:60px!important}.card>.mid{flex-basis:calc(100% - 84px)}.card>.pr{margin-left:auto;flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:6px 10px}.card>.pr b{font-size:25px}.card>.pr .badge{margin:0}
+.card>.th{width:80px!important;height:80px!important}.card>.mid{flex-basis:calc(100% - 104px)}.card>.pr{margin-left:auto;flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:6px 10px}.card>.pr b{font-size:25px}.card>.pr .badge{margin:0}
 .nm{font-size:16px;line-height:1.4}.tag{letter-spacing:0;font-weight:500}.th.ico{background:var(--panelhi);border:0;color:var(--lo)}
 .pill{border-radius:5px}.panel,.litem{border-radius:12px;box-shadow:none}.win{border-bottom:3px dotted var(--line);border-radius:10px;padding:16px;background:var(--panelhi)}.winname{font-weight:500}
 .big,.btn{border-radius:9px;min-height:44px}.nav{border-radius:0;box-shadow:none;border-top:1px solid var(--line);background:var(--panel)}.nav button{font-weight:500;font-size:14px}
 .basket-amount{display:flex;align-items:center;gap:8px;margin:8px 0 8px 28px;font-size:12px}
 .basket-amount input{width:80px}.basket-amount input,.basket-amount select{min-height:44px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line);border-radius:7px;padding:7px;font-size:16px}
-.dhero{float:right;margin:0 0 10px 12px}.dhero .th{width:68px!important;height:68px!important}.dtop h2{font-size:21px}.dbtns{clear:both;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.dbtns .btn{font-size:13px}.dbtns .btn[data-share],.dbtns .btn[data-close]{background:transparent;color:var(--lo);border:1px solid var(--line)}
+.dhero{float:right;margin:0 0 10px 12px}.dhero .th{width:132px!important;height:132px!important}.dtop h2{font-size:21px}.dbtns{clear:both;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.dbtns .btn{font-size:13px}.dbtns .btn[data-share],.dbtns .btn[data-close]{background:transparent;color:var(--lo);border:1px solid var(--line)}
+.th.photo{position:relative;background:#f5efe4;isolation:isolate}
+.th.photo>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#f5efe4}
+.photo-label{position:absolute;bottom:0;left:0;right:0;background:#f5efe4ed;color:#354535;font:500 9px/1.5 system-ui;text-align:center}
+.photo-label[hidden]{display:none}
+@media(max-width:350px){.card>.th{width:64px!important;height:64px!important}.card>.mid{flex-basis:calc(100% - 88px)}}
 #sheet{background:var(--panel)}.note{line-height:1.5}footer{max-width:640px;margin:auto}
 @media(min-width:600px){.card{flex-wrap:nowrap}.card>.mid{flex-basis:auto}.home-intro h2{font-size:42px}}
 </style>
@@ -979,6 +984,7 @@ const CAT_INK = { plod:"#57A80F", meso:"#D85A30", mlek:"#3789DD", hlyab:"#C98418
    Проверено срещу фийда: „паста“ например НЕ е двусмислена на практика —
    1 578 от 2 215 са паста за зъби, така че тя си остава туба. */
 const ICON_REFINE = {
+  "мляно": [["кафе", "coffee"], ["месо", "meat"]],
   "масло": [["краве", "butter"], ["олио", "oil"], ["зехтин", "oil"],
             ["нокти", "cream"], ["крака", "cream"], ["грим", "cream"], ["коса", "pump"]],
   "гел": [["съдове", "clean"], ["пране", "clean"], ["тоалетн", "clean"],
@@ -1038,21 +1044,64 @@ function iconOf(name) {
   // Алкохолът винаги е бутилка, каквото и да е казал типът. Полето `a` от
   // AI-я е по-надеждно от думите и вече го ползваме на други места.
   if ((g === "juice" || g === "water" || !g) && isAlcohol(name)) g = "bottle";
-  const res = { g: GLYPH[g || CAT_ICON[cat] || "box"], c: CAT_INK[cat] || CAT_INK.drugo };
+  const key = g || CAT_ICON[cat] || "box";
+  const res = { key, g: GLYPH[key], c: CAT_INK[cat] || CAT_INK.drugo };
   if (_icoCache.size < 40000) _icoCache.set(name, res);
   return res;
 }
-/* Плочката: истинската снимка, ако я има, иначе рисуваната икона. */
-function thumb(name, img, px) {
-  const url = safeUrl(img);
-  if (url) return `<img class="th" loading="lazy" src="${esc(url)}" alt=""
-    referrerpolicy="no-referrer" style="width:${px}px;height:${px}px">`;
-  const { g, c } = iconOf(name);
-  return `<span class="th ico" style="width:${px}px;height:${px}px;--ic:${c}">
-    <svg viewBox="0 0 24 24" width="${Math.round(px * 0.54)}" height="${Math.round(px * 0.54)}"
-      fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"
-      stroke-linejoin="round" aria-hidden="true">${g}</svg></span>`;
+/* Generated, unbranded category photography. Never presented as the SKU. */
+const PHOTO_FOR = {
+  coffee:"coffee", tea:"tea", milk:"milk", yogurt:"milk", cheese:"cheese",
+  egg:"eggs", bread:"bread", croissant:"bread", pasta:"pantry", sack:"pantry",
+  fruit:"fruit", veg:"veg", meat:"meat", fish:"fish", choco:"sweets", cookie:"sweets",
+  water:"drinks", juice:"drinks", tube:"care", brush:"care", pump:"care", soap:"care",
+  cream:"care", lipstick:"care", sun:"care", clean:"clean", roll:"clean", wipes:"clean", paw:"pet"
+};
+const PHOTO_ASSETS = [...new Set([...Object.values(PHOTO_FOR), "generic"])];
+const photoAsset = name => `assets/product-photos/${PHOTO_FOR[iconOf(name).key] || "generic"}.jpg`;
+const photoKey = (store, name) => JSON.stringify([String(store).trim().toLowerCase(), String(name).trim().toLowerCase().replace(/\s+/g," ")]);
+let photoSource = null, photoIndex = new Map();
+function indexedPhoto(store, name) {
+  if (!store) return "";
+  if (photoSource !== S.all) {
+    photoSource = S.all; photoIndex = new Map();
+    for (const o of S.all) {
+      const url = safeUrl(o.img), key = photoKey(o.store, o.name);
+      if (!url) continue;
+      // Conflicting images for the same identity are not guessed.
+      if (!photoIndex.has(key)) photoIndex.set(key,url);
+      else if (photoIndex.get(key) !== url) photoIndex.set(key,"");
+    }
+  }
+  return photoIndex.get(photoKey(store,name)) || "";
 }
+const isAssortment = name => /(?:различни|избрани)\s+(?:видове|вкусове|цветове)|асорти|assorted/i.test(name);
+function thumb(name, img, px, store = "") {
+  const url = safeUrl(img) || indexedPhoto(store,name), fallback = photoAsset(name);
+  const { g, c } = iconOf(name);
+  const note = !url ? "Илюстрация" : isAssortment(name) ? "Серия" : "";
+  const alt = !url ? `Илюстрация на категорията, не точна снимка: ${name}`
+    : isAssortment(name) ? `Снимка на серията: ${name}` : `Снимка от източника: ${name}`;
+  return `<span class="th photo" title="${esc(alt)}" style="width:${px}px;height:${px}px;--ic:${c}">
+    <svg viewBox="0 0 24 24" width="54%" height="54%"
+      fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"
+      stroke-linejoin="round" aria-hidden="true">${g}</svg>
+    <img loading="lazy" decoding="async" src="${esc(url || fallback)}" alt="${esc(alt)}"
+      referrerpolicy="no-referrer" data-photo-fallback="${fallback}" data-photo-stage="${url ? 0 : 1}">
+    <small class="photo-label" ${note ? "" : "hidden"}>${note}</small></span>`;
+}
+document.addEventListener("error", e => {
+  const img = e.target;
+  if (!img || !img.dataset || !img.dataset.photoFallback) return;
+  const host = img.parentElement, label = host.querySelector(".photo-label");
+  if (label) { label.hidden = false; label.textContent = "Илюстрация"; }
+  host.title = img.alt = "Илюстрация на категорията, не точна снимка на продукта";
+  const stage = Number(img.dataset.photoStage);
+  if (stage === 0) { img.dataset.photoStage = "1"; img.src = img.dataset.photoFallback; }
+  else if (stage === 1 && !img.dataset.photoFallback.endsWith("/generic.jpg")) {
+    img.dataset.photoStage = "2"; img.src = "assets/product-photos/generic.jpg";
+  } else img.remove(); // Finite fallback; vector stays visible even fully offline.
+}, true);
 
 const PACK_WORDS = new Set(["буркан"]);
 /* Кешът е задължителен, не разкош: catOf по 2253 оферти отнема 865 ms,
@@ -1336,6 +1385,7 @@ function applyLabels(f) {
   S.labels = m;
   S.labelAliases = aliases;
   _catCache.clear();        // етикетът бие правилата — старите отговори падат
+  _icoCache.clear();
   labelsVersion++;          // и думите на етикета по редовете се разчитат наново
 }
 /* Индексът за търсене се зарежда на ТРИ места (стартиране, кошницата,
@@ -1395,7 +1445,7 @@ function render() {
 function offerCard(o) {
   const pct = discountPct(o), ut = unitText(o), c = storeColor(o.store);
   return `<div class="card" role="button" tabindex="0" style="--sc:${c}" data-open="${esc(JSON.stringify({ t: "offer", s: o.store, n: o.name }))}">
-    ${thumb(o.name, o.img, 60)}
+    ${thumb(o.name, o.img, 80, o.store)}
     <div class="mid">
       <div class="tag"><i style="background:${c}"></i>${esc(o.store.toUpperCase())}</div>
       <div class="nm">${esc(o.name)}</div>
@@ -1416,7 +1466,7 @@ function hitRow(h) {
   const lbl = SRC_LABEL[h.f] || "";
   const ut = unitHit(h);
   return `<div class="card" role="button" tabindex="0" style="--sc:${c}" data-open="${esc(JSON.stringify({ t: "hit", s: h.s, n: h.n }))}">
-    ${thumb(h.n, null, 52)}
+    ${thumb(h.n, null, 80, h.s)}
     <div class="mid">
       <div class="tag"><i style="background:${c}"></i>${esc(h.s.toUpperCase())}
         ${lbl ? `<span class="pill violet">${lbl}</span>` : ""}</div>
@@ -2118,7 +2168,7 @@ function openDetail(ref, push = true) {
 
   let html = `<div class="dtop">
     ${S.detailStack.length ? `<button class="chip" data-back style="margin-bottom:8px">‹ Назад</button>` : ""}
-    <div class="dhero">${thumb(name, o ? o.img : null, 132)}</div>
+    <div class="dhero">${thumb(name, o ? o.img : null, 180, ref.s)}</div>
     <div class="tag"><i style="background:${storeColor(store)}"></i>${esc(store.toUpperCase())}</div>
     <h2>${esc(name)}</h2>
     <div class="dprice"><b class="${pct ? "hot" : ""}">${eur(price)} €</b><span>${fmt(price)} лв</span>

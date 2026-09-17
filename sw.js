@@ -17,10 +17,12 @@
 */
 "use strict";
 
-const VERSION = "v3.13-nearby";
+const VERSION = "v3.14-product-photos";
 const SHELL = "promoradar-shell-" + VERSION;
 const DATA = "promoradar-data-" + VERSION;
-const SHELL_FILES = ["./", "./index.html"];
+const PHOTO_FILES = "coffee milk cheese eggs bread pantry fruit veg meat fish sweets drinks tea care clean pet generic"
+  .split(" ").map(name => `assets/product-photos/${name}.jpg`);
+const SHELL_FILES = ["./", "./index.html", ...PHOTO_FILES];
 const DATA_MAX = 40;   // записа; фийдът е ~10 файла, останалото е стар боклук
 
 self.addEventListener("install", e => {
@@ -55,7 +57,15 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   const url = req.url;
 
-  if (url.includes("raw.githubusercontent.com")) {
+  if (PHOTO_FILES.some(file => url === new URL(file, self.registration.scope).href)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+      if (r.ok) {
+        const copy = r.clone();
+        e.waitUntil(caches.open(SHELL).then(c => c.put(req, copy)).catch(() => {}));
+      }
+      return r;
+    })));
+  } else if (url.includes("raw.githubusercontent.com")) {
     // данните: мрежата първо (свежи цени), кешът при липса на обхват
     e.respondWith(
       fetch(req).then(r => {
