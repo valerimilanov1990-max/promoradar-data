@@ -160,6 +160,8 @@ ok("Кошницата не връща стари цени при липсващ
 Object.assign(S,savedGeo);
 head("11. Снимки и обозначени илюстрации");
 const savedPhotoLabels = S.labels;
+ctx.applyLabels(null);
+ok("Млечната напитка без етикет не наследява категорията на марката", ctx.iconOf("MILKA Млечна напитка различни вкусове").key === "milk");
 for (const row of JSON.parse(fs.readFileSync(path.join(__dirname,"photo-classification-fixtures.json"),"utf8"))) {
   ctx.applyLabels({l:{[row.name.toLowerCase().replace(/\\s+/g," ").trim()]:{c:row.category,t:row.type}}});
   ok("Контекст на изображението: "+row.name, ctx.iconOf(row.name).key === row.key);

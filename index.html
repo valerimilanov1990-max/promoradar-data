@@ -1064,7 +1064,10 @@ function iconOf(name) {
   // AI-я е по-надеждно от думите и вече го ползваме на други места.
   if ((g === "juice" || g === "water" || !g) && isAlcohol(name)) g = "bottle";
   // Category conflicts and unresolved ambiguous types must not invent food.
-  if (g && cat !== "drugo" && PHOTO_CATEGORIES[g] && !PHOTO_CATEGORIES[g].includes(cat)) g = "box";
+  const photoCat = (labelFor(name) || {}).c;
+  // Only a feed category is evidence of a conflict. Name-based category
+  // guesses can themselves be wrong (e.g. MILKA milk drinks => sweets).
+  if (g && photoCat !== "drugo" && CAT_ICON[photoCat] && PHOTO_CATEGORIES[g] && !PHOTO_CATEGORIES[g].includes(photoCat)) g = "box";
   const key = g || (words.some(w => PHOTO_AMBIGUOUS.includes(w)) ? "box" : CAT_ICON[cat]) || "box";
   const res = { key, g: GLYPH[key], c: CAT_INK[cat] || CAT_INK.drugo };
   if (_icoCache.size < 40000) _icoCache.set(name, res);
