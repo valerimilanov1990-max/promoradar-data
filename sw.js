@@ -17,7 +17,7 @@
 */
 "use strict";
 
-const VERSION = "v3.14.1-photo-classification-r2";
+const VERSION = "v3.14.2-all-category-photo-validation";
 const SHELL = "promoradar-shell-" + VERSION;
 const DATA = "promoradar-data-" + VERSION;
 const PHOTO_FILES = "coffee milk cheese eggs bread pantry fruit veg meat fish sweets drinks tea care clean pet generic"

@@ -1082,7 +1082,79 @@ const PHOTO_FOR = {
   cream:"care", lipstick:"care", sun:"care", clean:"clean", roll:"clean", wipes:"clean", paw:"pet"
 };
 const PHOTO_ASSETS = [...new Set([...Object.values(PHOTO_FOR), "generic"])];
-const photoAsset = name => `assets/product-photos/${PHOTO_FOR[iconOf(name).key] || "generic"}.jpg`;
+// Photographs need stronger evidence than decorative icons. These rules are
+// shared with Android. No category-only fallback, adjectives or brand guessing.
+const PHOTO_FAMILY_CATEGORIES = {
+  coffee:["napit","bakal"], tea:["napit","bakal"], milk:["mlek","napit"],
+  cheese:["mlek"], eggs:["mlek","bakal"], bread:["hlyab","sladko","zamr"],
+  pantry:["bakal"], fruit:["plod","zamr"], veg:["plod","zamr","bakal"],
+  meat:["meso","zamr"], fish:["meso","zamr"], sweets:["sladko","hlyab"],
+  drinks:["napit"], care:["higi","bebe"], clean:["dom"], pet:["pet"]
+};
+const PHOTO_NOUNS = {
+  coffee:"кафе кофе несскафе нескафе еспресо капучино coffee espresso cappuccino",
+  tea:"чай tea",
+  milk:"мляко йогурт йогурти айран айрян кефир скир сметана",
+  cheese:"сирене сирена кашкавал моцарела пармезан чедър гауда фета извара катък",
+  eggs:"яйце яйца",
+  bread:"хляб хлеб питка питки земел чабата кроасан кроасани кифла козунак геврек баница банички",
+  pantry:"макарони спагети талиатели фусили фиде нудъли юфка брашно захар сол ориз леща боб нахут булгур киноа фасул лютеница компот конфитюр мармалад кетчуп майонеза горчица песто хумус олио зехтин оцет подправки чубрица канела ванилия риган",
+  fruit:"ябълки ябълка банани банан портокали портокал лимони лимон грозде диня дини пъпеш круши праскови кайсии сливи череши ягоди малини боровинки киви ананас авокадо манго смокини фурми",
+  veg:"домати домат краставици краставица зеле лук кромид моркови морков картофи картоф гъби чесън тиквички патладжан чушки пиперки марули спанак броколи карфиол цвекло репички целина магданоз копър зеленчуци",
+  meat:"месо кайма пиле свинско свинска свински пилешко пилешки телешко телешки агнешко пуешко заешко",
+  fish:"риба риби скумрия пъстърва ципура лаврак толстолоб сьомга хек сардина херинга калмар калмари скариди миди омар октопод аншоа цаца попче сафрид кефал барбун паламуд каракуда мерлуза тон сом шаран треска пангасиус зарган калкан писия милокоп чернокоп фагри",
+  sweets:"шоколад бонбони бонбон вафла вафли нуго халва локум бисквити бисквита курабийки меденки кекс торта чийзкейк",
+  drinks:"сок нектар фреш смути лимонада тоник комбуча",
+  care:"шампоан балсам сапун лосион серум пилинг дезодорант антиперспирант парфюм червило гланц спирала лакочистител",
+  clean:"препарат веро белина омекотител обезмаслител стъклочистач",
+  pet:"котешка котешки кучешка кучешки"
+};
+// Context phrases outrank ingredient words. All regexes use normalized spaces,
+// not JavaScript's ASCII-only word boundary; Kotlin uses the identical tables.
+const PHOTO_CONTEXT = [
+  ["pet", "(?:храна|пауч|лакомства|лакомство) (?:за )?(?:кучета|куче|котки|котка|котенца|птици|риби)"],
+  ["clean", "(?:гел|капсули|таблетки|прах|сол) за (?:пране|съдове|съдомиялна|съдомиялни)|почистващ препарат|wc гел"],
+  ["care", "(?:мляко|масло|крем|олио|вода|маска|гел|боя) за (?:тяло|лице|коса|ръце|крака|нокти|уста)|(?:паста|четка) за зъби|душ гел|мицеларна вода|тоалетна вода|слънцезащитен крем"],
+  ["milk", "млечна напитка|кисело мляко|прясно мляко"],
+  ["drinks", "(?:минерална|изворна|трапезна|газирана) вода|вода (?:минерална|изворна|трапезна|газирана)|(?:безалкохолна|енергийна|газирана|негазирана) напитка"],
+  ["veg", "зелен фасул"],
+  ["generic", "растително мляко|кокосово мляко|бадемово мляко|овесено мляко"]
+];
+// No matching photograph exists for these identities. Do not show ingredients,
+// raw meat for prepared meals, vegetables for flowers, or cleaner for paper.
+const PHOTO_BLOCKERS = "сладолед джелато масло маргарин пастет салам колбас наденица кренвирши шунка бекон прошуто суджук луканка кюфтета кебапчета шницел шницели пица суши супа салата пюре каша чипс крекер солети ядки бадеми орехи фъстъци лешници семена хризантема роза орхидея бегония фикус лавандула антуриум каланхое бромелия сентполия мушкато цвете букет саксия тиган тенджера чаша чаши чиния купа прибори нож чинии тава сервиз четка хартия салфетки кърпи кърпички пелени памперси батерия батерии лампа крушка тениска блуза чорапи панталон обувки цигари тютюн пури бира вино водка ракия уиски коняк";
+const photoWords = new Map(Object.entries(PHOTO_NOUNS).flatMap(([f,s]) => s.split(" ").map(w=>[w,f])));
+const photoBlocks = new Set(PHOTO_BLOCKERS.split(" "));
+const photoContexts = PHOTO_CONTEXT.map(([f,p]) => [f,new RegExp("(?:^| )(?:"+p+")(?: |$)")]);
+function photoEvidence(text) {
+  const n = String(text || "").toLowerCase().replace(/[^a-zа-я0-9]+/g," ").trim();
+  // Ingredients/flavours are not the photographed identity.
+  const head = n.split(/ (?:с|със|вкус|аромат|пълнеж|от) /)[0];
+  const contextual = new Set(photoContexts.filter(([,re])=>re.test(head)).map(([f])=>f));
+  if (contextual.size) {
+    const rest = photoContexts.reduce((s,[,re])=>s.replace(re," "),head);
+    if (rest.split(" ").some(w=>photoBlocks.has(w))) return "generic";
+    return contextual.size === 1 ? [...contextual][0] : "generic";
+  }
+  const words = head.split(" ");
+  if (words.some(w=>photoBlocks.has(w))) return "generic";
+  const families = new Set(words.map(w=>photoWords.get(w)).filter(Boolean));
+  return families.size === 1 ? [...families][0] : families.size ? "generic" : "";
+}
+function photoFamily(name) {
+  if (isAlcohol(name)) return "generic";
+  const fromName = photoEvidence(name), fromType = photoEvidence(typeOf(name));
+  let family = fromName || fromType;
+  if (fromName && fromType && fromName !== fromType) return "generic";
+  if (!family && coffeeSeries(name, catOf(name))) family = "coffee";
+  if (!family || family === "generic") return "generic";
+  const category = (labelFor(name) || {}).c;
+  // Missing/unknown taxonomy never invents a photo. Explicit identity can still
+  // work without labels; a contradictory known category vetoes it everywhere.
+  if (category && category !== "drugo" && !PHOTO_FAMILY_CATEGORIES[family]?.includes(category)) return "generic";
+  return family;
+}
+const photoAsset = name => `assets/product-photos/${photoFamily(name)}.jpg`;
 const photoKey = (store, name) => JSON.stringify([String(store).trim().toLowerCase(), String(name).trim().toLowerCase().replace(/\s+/g," ")]);
 let photoSource = null, photoIndex = new Map();
 function indexedPhoto(store, name) {

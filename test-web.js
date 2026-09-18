@@ -101,7 +101,7 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "iconOf", "GLYPH", "ICON_FOR", "thumb", "comparableRows",
   "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe",
   "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar",
-  "PHOTO_ASSETS", "photoAsset", "indexedPhoto", "photoKey", "isAssortment"];
+  "PHOTO_ASSETS", "PHOTO_FOR", "photoAsset", "photoFamily", "PHOTO_FAMILY_CATEGORIES", "photoEvidence", "indexedPhoto", "photoKey", "isAssortment"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -166,6 +166,23 @@ for (const row of JSON.parse(fs.readFileSync(path.join(__dirname,"photo-classifi
   ctx.applyLabels({l:{[row.name.toLowerCase().replace(/\\s+/g," ").trim()]:{c:row.category,t:row.type}}});
   ok("Контекст на изображението: "+row.name, ctx.iconOf(row.name).key === row.key);
 }
+for (const row of JSON.parse(fs.readFileSync(path.join(__dirname,"photo-family-fixtures.json"),"utf8"))) {
+  ctx.applyLabels(row.category ? {l:{[row.name.toLowerCase().trim()]:{c:row.category,t:row.type}}} : null);
+  ok("Снимка във всички категории: "+row.name, ctx.photoFamily(row.name) === row.photo, "получих: "+ctx.photoFamily(row.name));
+}
+// Every supported family is rejected in every incompatible category, even if
+// both the name and AI type agree. Unknown products stay neutral in all 16.
+const examples = {coffee:"Кафе",tea:"Чай",milk:"Мляко",cheese:"Сирене",eggs:"Яйца",bread:"Хляб",pantry:"Ориз",fruit:"Ябълки",veg:"Домати",meat:"Месо",fish:"Риба",sweets:"Шоколад",drinks:"Сок",care:"Шампоан",clean:"Препарат",pet:"Котешка храна"};
+const categories = ["plod","meso","mlek","hlyab","bakal","napit","sladko","zamr","higi","dom","teh","dreh","pet","bebe","tut","drugo"];
+for (const category of categories) {
+  ctx.applyLabels({l:{"непознат артикул":{c:category,t:""}}});
+  ok("Няма снимка само по категория: "+category, ctx.photoFamily("Непознат артикул") === "generic");
+  for (const [family,name] of Object.entries(examples)) {
+    ctx.applyLabels({l:{[name.toLowerCase()]:{c:category,t:name.toLowerCase()}}});
+    const allowed = category === "drugo" || ctx.PHOTO_FAMILY_CATEGORIES[family].includes(category);
+    ok("Категориен договор "+family+" / "+category, ctx.photoFamily(name) === (allowed ? family : "generic"));
+  }
+}
 ctx.applyLabels(savedPhotoLabels ? {l:savedPhotoLabels} : null);
 ok("Мляното кафе не е месо", ctx.iconOf("Davidoff Мляно кафе различни видове").key === "coffee");
 ok("Мляното месо остава месо", ctx.iconOf("Мляно месо").key === "meat");
@@ -218,6 +235,30 @@ for (const s of S.idx.stores) {
 console.log(`Заредено за ${Date.now() - t0} ms · ${S.all.length} оферти · ` +
   `${S.search.length} реда в индекса · ${Object.keys(S.labels).length} етикета ` +
   `(${S.labelAliases} свързани по почистено име)`);
+
+// Full catalogue audit, including every labelled name rather than just a few
+// searched products. This is structural validation, not a human photo review.
+if (process.argv.includes("--photo-audit")) {
+  const names = new Set([...S.search.map(i=>i.n),...S.all.map(o=>o.name),...Object.keys(S.labels)]);
+  const report = {feedUpdated:rd("labels.json").updated,total:names.size,changed:0,neutral:0,violations:0,categories:{}};
+  for (const name of names) {
+    const label = ctx.labelFor(name) || {};
+    const cat = label.c || "unlabelled", family = ctx.photoFamily(name);
+    const before = ctx.PHOTO_FOR[ctx.iconOf(name).key] || "generic";
+    const group = report.categories[cat] ||= {total:0,neutral:0,changed:0,families:{},examples:[]};
+    group.total++; group.families[family] = (group.families[family] || 0)+1;
+    if (family === "generic") { report.neutral++; group.neutral++; }
+    if (family !== before) {
+      report.changed++; group.changed++;
+      if (group.examples.length < 20) group.examples.push({name,type:label.t || "",before,after:family});
+    }
+    if (!ctx.PHOTO_ASSETS.includes(family) || (family !== "generic" && label.c && label.c !== "drugo" && !ctx.PHOTO_FAMILY_CATEGORIES[family]?.includes(label.c))) report.violations++;
+  }
+  const dest = path.join(__dirname,"../release-2026-09-18/photo-catalogue-audit.json");
+  fs.writeFileSync(dest,JSON.stringify(report,null,2)+"\n");
+  console.log(JSON.stringify({...report,categories:Object.fromEntries(Object.entries(report.categories).map(([k,v])=>[k,{...v,examples:undefined}]))},null,2));
+  process.exit(report.violations ? 1 : 0);
+}
 
 /* =================================================================== */
 head("1. NameClean — счупените имена");
