@@ -1,0 +1,116 @@
+[
+  {
+    "name": "250 гр Davidoff Fine Aroma мляно 12б/к",
+    "type": "файн арома мляно",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "250гр Davidoff Rich Aroma мляно 12 б/к",
+    "type": "рич арома мляно",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "250гр Davidoff crema intense мляно 12б/к",
+    "type": "крема интенс мляно",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "250гр Davidoff Espresso мляно 12б/к",
+    "type": "еспресо мляно",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "Давидоф Файн Арома 250 г",
+    "type": "файн арома",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "Davidoff Fine Aroma 250 г",
+    "type": "",
+    "category": "drugo",
+    "key": "coffee"
+  },
+  {
+    "name": "Davidoff crema intense мляно 250г",
+    "type": "",
+    "category": "drugo",
+    "key": "coffee"
+  },
+  {
+    "name": "Непознато мляно 250 г",
+    "type": "мляно",
+    "category": "napit",
+    "key": "box"
+  },
+  {
+    "name": "Непознато crema 250 г",
+    "type": "crema",
+    "category": "napit",
+    "key": "box"
+  },
+  {
+    "name": "Непознато крема 250 г",
+    "type": "крема",
+    "category": "napit",
+    "key": "box"
+  },
+  {
+    "name": "Продукт с противоречив етикет",
+    "type": "месо",
+    "category": "napit",
+    "key": "box"
+  },
+  {
+    "name": "Напитка с противоречив етикет",
+    "type": "сирене",
+    "category": "napit",
+    "key": "box"
+  },
+  {
+    "name": "Мляно месо 500 г",
+    "type": "мляно месо",
+    "category": "meso",
+    "key": "meat"
+  },
+  {
+    "name": "Крема сирене 200 г",
+    "type": "крема сирене",
+    "category": "mlek",
+    "key": "cheese"
+  },
+  {
+    "name": "Мляно кафе 250 г",
+    "type": "мляно кафе",
+    "category": "napit",
+    "key": "coffee"
+  },
+  {
+    "name": "Davidoff Cool Water парфюм",
+    "type": "парфюм",
+    "category": "higi",
+    "key": "spray"
+  },
+  {
+    "name": "Davidoff Fine Aroma цигари",
+    "type": "цигари",
+    "category": "tut",
+    "key": "cigs"
+  },
+  {
+    "name": "Davidoff Fine Aroma крем за лице",
+    "type": "крем за лице",
+    "category": "higi",
+    "key": "cream"
+  },
+  {
+    "name": "Пилинг с кафе",
+    "type": "кафе",
+    "category": "higi",
+    "key": "box"
+  }
+]

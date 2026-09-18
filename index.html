@@ -1019,6 +1019,24 @@ const ICON_REFINE = {
 };
 
 /* Иконата на един продукт: типът от AI, после категорията. */
+// A preparation/texture word is not a product identity. Keep these out of
+// single-word guesses even when supplied as the entire AI type.
+const PHOTO_AMBIGUOUS = ["мляно", "млян", "мляна", "крема", "crema"];
+const COFFEE_SERIES = ["fine aroma", "файн арома", "rich aroma", "рич арома",
+  "crema intense", "крема интенс", "espresso", "еспресо"];
+const PHOTO_CATEGORIES = {
+  coffee:["napit","bakal"], tea:["napit","bakal"], meat:["meso","zamr"], fish:["meso","zamr"],
+  cheese:["mlek"], milk:["mlek","napit"], yogurt:["mlek"], egg:["mlek"],
+  bread:["hlyab"], croissant:["hlyab","sladko"], fruit:["plod"], veg:["plod","bakal","zamr"],
+  choco:["sladko"], cookie:["sladko","hlyab"], water:["napit"], juice:["napit"]
+};
+function coffeeSeries(name, cat) {
+  if (!["napit","bakal","drugo"].includes(cat)) return false;
+  const n = " " + name.toLowerCase().replace(/[^a-zа-я0-9]+/g," ").trim() + " ";
+  if (!n.includes(" davidoff ") && !n.includes(" давидоф ")) return false;
+  if (/цигар|тютюн|пур[аи]|парфюм|тоалетна|дезодорант|месо|сирене|cool water/.test(n)) return false;
+  return COFFEE_SERIES.some(s => n.includes(" "+s+" "));
+}
 const _icoCache = new Map();
 function iconOf(name) {
   const hit = _icoCache.get(name);
@@ -1030,21 +1048,24 @@ function iconOf(name) {
   const t = typeOf(name).toLowerCase();
   const words = t ? t.split(" ") : tokenize(name);
   const probe = t || name.toLowerCase();
-  let g = null;
+  let g = coffeeSeries(name, cat) ? "coffee" : null;
   // 1. Двусмислените думи, гледани спрямо ЦЕЛИЯ низ и на която и позиция
   //    да стоят: „краве масло“ е масло, макар водещата дума да е „краве“.
   for (const w of words) {
+    if (g) break;
     const ref = ICON_REFINE[w];
     if (!ref) continue;
     for (const [mark, glyph] of ref) if (probe.includes(mark)) { g = glyph; break; }
     if (g) break;
   }
   // 2. Иначе първата дума, за която изобщо има форма.
-  if (!g) for (const w of words) if (ICON_FOR[w]) { g = ICON_FOR[w]; break; }
+  if (!g) for (const w of words) if (!PHOTO_AMBIGUOUS.includes(w) && ICON_FOR[w]) { g = ICON_FOR[w]; break; }
   // Алкохолът винаги е бутилка, каквото и да е казал типът. Полето `a` от
   // AI-я е по-надеждно от думите и вече го ползваме на други места.
   if ((g === "juice" || g === "water" || !g) && isAlcohol(name)) g = "bottle";
-  const key = g || CAT_ICON[cat] || "box";
+  // Category conflicts and unresolved ambiguous types must not invent food.
+  if (g && cat !== "drugo" && PHOTO_CATEGORIES[g] && !PHOTO_CATEGORIES[g].includes(cat)) g = "box";
+  const key = g || (words.some(w => PHOTO_AMBIGUOUS.includes(w)) ? "box" : CAT_ICON[cat]) || "box";
   const res = { key, g: GLYPH[key], c: CAT_INK[cat] || CAT_INK.drugo };
   if (_icoCache.size < 40000) _icoCache.set(name, res);
   return res;
@@ -1375,7 +1396,7 @@ async function boot() {
    почистени. Без втори ключ по почистеното име покритието пада наполовина
    — точно това чупеше сравнението и в приложението. */
 function applyLabels(f) {
-  if (!f || !f.l) { S.labels = null; return; }
+    if (!f || !f.l) { S.labels = null; _catCache.clear(); _icoCache.clear(); labelsVersion++; return; }
   const m = f.l;
   let aliases = 0;
   for (const k of Object.keys(f.l)) {          // снимка: пишем в същия обект

@@ -159,6 +159,12 @@ S.geoKm = null;
 ok("Кошницата не връща стари цени при липсваща локация", ctx.comparableRows("мляко").rows.length === 0);
 Object.assign(S,savedGeo);
 head("11. Снимки и обозначени илюстрации");
+const savedPhotoLabels = S.labels;
+for (const row of JSON.parse(fs.readFileSync(path.join(__dirname,"photo-classification-fixtures.json"),"utf8"))) {
+  ctx.applyLabels({l:{[row.name.toLowerCase().replace(/\\s+/g," ").trim()]:{c:row.category,t:row.type}}});
+  ok("Контекст на изображението: "+row.name, ctx.iconOf(row.name).key === row.key);
+}
+ctx.applyLabels(savedPhotoLabels ? {l:savedPhotoLabels} : null);
 ok("Мляното кафе не е месо", ctx.iconOf("Davidoff Мляно кафе различни видове").key === "coffee");
 ok("Мляното месо остава месо", ctx.iconOf("Мляно месо").key === "meat");
 ok("Непознат продукт има неутрална илюстрация", ctx.photoAsset("ZXQ неизвестен артикул") === "assets/product-photos/generic.jpg");
