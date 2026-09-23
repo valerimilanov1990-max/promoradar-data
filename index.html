@@ -503,6 +503,7 @@ function tierOf(it, alts) {
 function searchIn(items, query, limit = 80, near = false) {
   const seen = new Set();
   let rows = items
+    .filter(it => offerActive(it) && Number.isFinite(it.p) && it.p > 0)
     .map(it => [it, matchScore(it.n, query)])
     .filter(([it, sc]) => sc >= 0 && !S.hidden.has(it.s) && !(near && isFar(it.s)))
     .sort((a, b) => a[1] - b[1]
@@ -1360,7 +1361,8 @@ const S = {
   watch: readArr("pr_watch"),
   seen: new Set(readArr("pr_seen")),
   ranking: null, perItem: null, chosen: null, busy: false,
-  cfg: null, reported: {}, repOpen: false,
+  cfg: null, reported: Object.fromEntries(readArr("pr_reports").filter(r => r && typeof r.store === "string" && typeof r.product === "string").map(r => [r.store + "|" + r.product,r])), repOpen: false,
+  resultSort: "relevance",
   labels: null, labelAliases: 0,
   detailStack: [], lastRef: null, histPushed: false,
   hidden: new Set(readArr("pr_hidden")),
@@ -1524,10 +1526,78 @@ function uncertainCurrency(store, name, price, old, pct, currency) {
     discount != null && discount >= 46 && discount <= 52;
 }
 const isJunk = o => uncertainCurrency(o.store, o.rawName || o.name || "", o.price, o.old, o.pct, o.currency) || !o.name || o.name.trim().length < 3 || JUNK.test(o.name)
-  || o.name.includes("/опаковка") || !(o.price > 0) || o.price > 5000
+  || o.name.includes("/опаковка") || !(o.price > 0) || o.price > 5000 || !offerActive(o)
   || !/[A-Za-zА-Яа-я]{3}/.test(o.name);
 
 /* ---------- изгледи ---------- */
+function policyDate(value) {
+  const s = String(value || "").trim().slice(0,10);
+  const dot = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s);
+  const iso = dot ? `${dot[3]}-${dot[2]}-${dot[1]}` : s;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const d = new Date(iso + "T12:00:00Z");
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === iso ? iso : null;
+}
+function localDay() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function offerActive(row, today = localDay()) {
+  const from = policyDate(row.validFrom), to = policyDate(row.validTo);
+  return (!from || from <= today) && (!to || to >= today);
+}
+function trustText(row, today = localDay()) {
+  const source = row.f ?? 0;
+  const origin = source === 1 ? "Официален ценоразпис" : [2,3].includes(source) ? "Подадена от магазин" : source === 4 ? "Лична цена" : "Сайт на веригата";
+  const own = policyDate(row.sourceDate), feedDate = policyDate(S.idx?.updated), until = policyDate(row.validTo);
+  const stamp = own ? `Цена от ${own}` : feedDate ? `Фийд от ${feedDate} · датата на цената не е потвърдена` : "Дата на цената: неизвестна";
+  const old = (own || feedDate) && (new Date(today) - new Date(own || feedDate)) > 7*86400000;
+  return `${origin} · ${stamp}${old ? " · Данни над 7 дни" : ""} · ${until ? "До " + until : "Срокът не е потвърден"}`;
+}
+function unitGroup(label) {
+  const unit = String(label || "").split("/").pop().trim().toLowerCase();
+  return ({"кг":"кг",kg:"кг","л":"л",l:"л","бр":"бр","бр.":"бр",pc:"бр"})[unit] || "";
+}
+function sortResults(rows, mode, distances = S.geoKm) {
+  const price = r => r.p ?? r.price, name = r => r.n ?? r.name;
+  const unit = r => r.u ?? r.unitPrice;
+  const group = r => Number.isFinite(unit(r)) && unit(r)>0 ? unitGroup(r.l ?? r.unitLabel) : "";
+  const distance = r => { const d = distances?.[r.s ?? r.store]; return Number.isFinite(d) && d>=0 ? d : Infinity; };
+  if(mode === "price") return [...rows].sort((a,b) => price(a)-price(b) || name(a).localeCompare(name(b),"bg"));
+  if(mode === "distance") return [...rows].sort((a,b) => distance(a)-distance(b) || price(a)-price(b));
+  if(mode === "unit") return [...rows].sort((a,b) => Number(!group(a))-Number(!group(b)) || group(a).localeCompare(group(b),"bg") || (group(a) ? unit(a)-unit(b) : 0) || price(a)-price(b));
+  return rows;
+}
+function sortControls() {
+  const modes = [["relevance","По съвпадение"],["price","Цена/опаковка"],["unit","Цена/кг, л, бр"],["distance","Разстояние"]];
+  const hint = S.resultSort === "price" ? "Сравнява цените на опаковките. Разфасовките може да са различни."
+    : S.resultSort === "unit" ? "Отделни групи: бройки, килограми и литри; неизвестните мерки са последни."
+    : S.resultSort === "distance" ? "По права линия до най-близкия обект на веригата; неизвестните разстояния са последни."
+    : "Най-близките съвпадения с търсенето са първи — не е класация по цена.";
+  return `<div class="chips" aria-label="Подреждане">${modes.map(([m,t]) => `<button class="chip ${S.resultSort===m?'on':''}" data-resultsort="${m}" aria-pressed="${S.resultSort===m}">${t}</button>`).join("")}</div><div class="note">${hint}</div>`;
+}
+function sameCatalogueProduct(a,b) {
+  const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g," ");
+  return !!(a && b && norm(a.p) && norm(a.b) && norm(a.q) && ["p","b","q"].every(k => norm(a[k])===norm(b[k])));
+}
+function catalogueMatches(name) {
+  const label = labelFor(name), stores = new Map();
+  for (const h of S.search || []) {
+    if (!offerActive(h) || !Number.isFinite(h.p) || h.p <= 0 || h.requiresCard || S.hidden.has(h.s) || isFar(h.s) || !sameCatalogueProduct(label,labelFor(h.n))) continue;
+    if (!stores.has(h.s) || h.p < stores.get(h.s).p) stores.set(h.s,h);
+  }
+  return [...stores.values()].sort((a,b)=>a.p-b.p);
+}
+const REPORT_KINDS = {higher:"В магазина е по-скъпо",lower:"В магазина е по-евтино",expired:"Промоцията е изтекла",missing:"Продуктът липсва",wrong:"Друг продукт",photo:"Грешна снимка",pack:"Грешна разфасовка"};
+function reportPrice(value) {
+  const text = String(value).trim().replace(",",".");
+  if (!/^\d+(\.\d+)?$/.test(text)) return null;
+  const n = Number(text);
+  return Number.isFinite(n) && n>0 && n<5000 ? n : null;
+}
+function reportText(r) {
+  return `Сигнал за Промо Радар\nМагазин: ${r.store}\nПродукт: ${r.product}\nПоказана цена: ${r.shownEur} EUR\nЦена на етикета: ${r.realEur ?? "не е въведена"}${r.realEur == null ? "" : " EUR"}\nГрешка: ${REPORT_KINDS[r.kind] || "Друго"}\nБележка: ${r.note || "—"}\nДата: ${r.date}`;
+}
 function render() {
   $("view").innerHTML = S.tab === "today" ? viewToday()
     : S.tab === "list" ? viewList() : viewMore();
@@ -1545,6 +1615,7 @@ function offerCard(o) {
     <div class="mid">
       <div class="tag"><i style="background:${c}"></i>${esc(o.store.toUpperCase())}</div>
       <div class="nm">${esc(o.name)}</div>
+      <div class="mini">${esc(trustText(o))}</div>
       ${o.requiresCard ? '<span class="pill">Условна цена · карта/купон</span>' : ""}
       ${ut ? `<span class="pill amber">${ut}</span>` : ""}
     </div>
@@ -1567,6 +1638,8 @@ function hitRow(h) {
       <div class="tag"><i style="background:${c}"></i>${esc(h.s.toUpperCase())}
         ${lbl ? `<span class="pill violet">${lbl}</span>` : ""}</div>
       <div class="nm">${esc(h.n)}</div>
+      <div class="mini">${esc(trustText(h))}</div>
+      ${S.resultSort === "distance" ? `<div class="mini">${Number.isFinite(S.geoKm?.[h.s]) ? esc(fmtKm(S.geoKm[h.s])) + " по права линия" : "Разстояние: неизвестно"}</div>` : ""}
       ${h.requiresCard ? '<span class="pill">Условна цена · карта/купон</span>' : ""}
       ${ut ? `<span class="pill amber">${ut}</span>` : ""}
     </div>
@@ -1586,7 +1659,7 @@ function viewToday() {
 
   let head = `${q.length < 2 ? '<div class="home-intro"><span>ПАЗАРУВАЙ С ЯСНА СМЕТКА</span><h2>Добрите покупки<br>започват оттук.</h2><button class="home-list" data-tab="list">' + (S.list.length ? "Твоята кошница · " + S.list.length + " продукта" : "Създай твоята кошница") + ' <span aria-hidden="true">↗</span></button></div>' : ""}<div class="search"><input id="q" type="search" aria-label="Търси във всички магазини" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
 
-  if (S.nearOnly) head += nearbyControls();
+  if (S.nearOnly || S.resultSort === "distance") head += nearbyControls();
   if (q.length >= 2) {
     if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
     // Подсказките стоят НАД резултатите, а не вместо тях: пишеш и виждаш
@@ -1599,9 +1672,9 @@ function viewToday() {
         <span class="mini">${e.kind === "b" ? "марка · " : ""}${esc(catMeta(e.cat)[2])}</span>
         <b class="mini">${e.n} вериги</b></div>`).join("") + `</div>` : "";
 
-    const res = searchIn(S.search, q, 80, true);
+    const res = sortResults(searchIn(S.search, q, Infinity, true),S.resultSort);
     return head + sugHtml + (res.length
-      ? `<div class="note">${res.length} резултата · подредени по цена за единица</div>` + res.map(hitRow).join("")
+      ? `<div class="note">${res.length} резултата</div>` + sortControls() + res.slice(0,S.limit).map(hitRow).join("") + moreBtn(res.length)
       : `<div class="empty"><b>Нищо за „${esc(q)}“</b><p>Пробвай по-обща дума — „мляко“ вместо „прясно мляко Верея 3%“.</p></div>`);
   }
 
@@ -1643,10 +1716,10 @@ function viewToday() {
   let rows, names;
   if (officialOnly) {
     if (!S.search) return head + chips + `<div class="note">Зареждам цените…</div>`;
-    rows = S.search.filter(it => it.s === S.store);
+    rows = S.search.filter(it => it.s === S.store && offerActive(it) && !far(it.s));
     names = rows.map(r => r.n);
   } else {
-    rows = S.all.filter(o => (!S.store || o.store === S.store) && !S.hidden.has(o.store));
+    rows = S.all.filter(o => offerActive(o) && (!S.store || o.store === S.store) && !far(o.store));
     names = rows.map(r => r.name);
   }
 
@@ -1682,7 +1755,7 @@ function viewToday() {
 
   if (officialOnly) {
     let list = rows.filter(r => !S.cat || catOf(r.n) === S.cat);
-    list = S.byUnit ? list.filter(r => r.u != null).sort((a, b) => a.u - b.u)
+    list = S.byUnit ? sortResults(list,"unit")
                     : list.sort((a, b) => a.p - b.p);
     return head + chips + catsBar +
       `<div class="note"><b>${list.length} цени в ${esc(S.store)}</b> — редовни цени от официалните данни на КЗП, не промоции.</div>` +
@@ -1690,12 +1763,12 @@ function viewToday() {
   }
 
   let list = rows.filter(o => !S.cat || catOf(o.name) === S.cat);
-  list = S.byUnit ? list.filter(o => o.unitPrice != null).sort((a, b) => a.unitPrice - b.unitPrice)
+  list = S.byUnit ? sortResults(list,"unit")
                   : list.sort((a, b) => (discountPct(b) || 0) - (discountPct(a) || 0));
   const upd = S.idx.updated ? `<div class="note">${list.length} намаления · данните са от ${esc(S.idx.updated)}</div>` : "";
   return head + upd8 + chips + watchHtml + catsBar + upd +
     (list.length ? list.slice(0, S.limit).map(offerCard).join("") + moreBtn(list.length)
-      : `<div class="empty"><b>Още зареждам офертите…</b></div>`);
+      : `<div class="empty"><b>${S.nearOnly ? "Няма оферти с потвърдено разстояние в този радиус." : "Няма оферти за избраните филтри."}</b><p>${S.nearOnly ? "Обнови местоположението или изключи „Само наблизо“." : "Промени филтрите или обнови данните."}</p></div>`);
 }
 /* Рисуват се 120 карти, не 600. render() пресъздава целия DOM с innerHTML
    при всеки чип и всяка буква — 600 карти правят това видимо бавно на
@@ -1739,7 +1812,7 @@ function viewMore() {
       <div class="note">Уеб версията не може да буди телефона — за това трябва пуш сървър, а Промо Радар няма сървър по замисъл. Затова следените думи докладват на екран „Днес“ при всяко отваряне. Истинските известия при намаление са в приложението за Android.</div></div>
 
     <div class="panel"><b>ℹ За данните</b>
-      <div class="note">Цените идват от достъпните официални дневни данни на КЗП и от промоционалните брошури на четири вериги. Едно и също нещо в различни магазини рядко е буквално един и същ артикул — затова „По-точно съвпадение“ е отделно от „Подобни продукти“ и когато няма съвпадение, пише честно, че няма.</div></div>`;
+      <div class="note">Цените идват от достъпните официални дневни данни на КЗП и от сайтовете на веригите. „Съвпадение по каталог“ изисква еднакви каталожно име, марка и разфасовка, но не е проверка по баркод. „Алтернативи“ може да сравнява различни марки и количества. Датата на обновяване на фийда не потвърждава датата на всяка цена.</div></div>`;
 }
 
 /* ---------- наблизо ---------- */
@@ -1795,7 +1868,7 @@ function nearbyControls() {
     <div class="note">Пълните кошници са първи. ${S.nearOnly || S.basketSort === "distance" ? "Приблизително по права линия до най-близкия известен обект. Цената е за веригата, не е потвърдена за този обект. Без изпращане на позицията към Промо Радар." : "Включи „Само наблизо“, за да ограничиш радиуса."}</div>
     ${S.geoBusy ? '<div role="status">Определям местоположението…</div>' : ""}
     ${S.geoError ? `<div role="alert">${esc(S.geoError)}</div>` : ""}
-    ${(S.nearOnly || S.basketSort === "distance") && !S.geoBusy ? '<button class="chip" data-locate>Обнови местоположението</button>' : ""}</div>`;
+    ${(S.nearOnly || S.basketSort === "distance" || S.resultSort === "distance") && !S.geoBusy ? '<button class="chip" data-locate>Обнови местоположението</button>' : ""}</div>`;
 }
 
 /* ---------- кошницата ----------
@@ -2270,14 +2343,16 @@ function openDetail(ref, push = true) {
     <div class="dprice"><b class="${pct ? "hot" : ""}">${eur(price)} €</b><span>${fmt(price)} лв</span>
       ${old ? `<s>${eur(old)} €</s>` : ""}${pct ? `<span class="badge">−${pct}%</span>` : ""}</div>
     ${ut ? `<div class="pill amber">${ut}</div>` : ""}
-    <div class="note">${base.requiresCard ? "Условна цена с карта/купон. " : ""}${base.validTo ? "Валидна до " + esc(base.validTo) + "." : "Срокът и наличността не са потвърдени — провери в магазина."}</div>
+    <div class="note">${esc(trustText(base))}. ${base.requiresCard ? "Условна цена с карта/купон. " : ""}Наличността не е потвърдена — провери в магазина.</div>
   </div>`;
 
   if (S.search) {
-    const [ev, kw] = compareQuery(name, S.cmpStrict);
+    const [candidates, kw] = S.cmpStrict ? [catalogueMatches(name),"каталог, марка и разфасовка"] : compareQuery(name, false);
+    const ev = sortResults(candidates,"price");
     const modeBtns = `<div class="chips" style="margin:6px 0">
-      <button class="chip ${S.cmpStrict ? "" : "on"}" data-cmpmode="0">Подобни продукти</button>
-      <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">По-точно съвпадение</button></div>`;
+      <button class="chip ${S.cmpStrict ? "" : "on"}" data-cmpmode="0">Алтернативи</button>
+      <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">Съвпадение по каталог</button></div>
+      <div class="note">${S.cmpStrict ? "Съвпадат каталожно име, марка и разфасовка. Не е потвърждение по баркод. Условните цени с карта са изключени." : "Възможни алтернативи, не същият продукт. Марките и количествата може да се различават."} Показаните предложения са подредени по цена за опаковка.</div>`;
     if (ev.length >= 2) {
       const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
       html += `<h3>Цените навсякъде</h3>${modeBtns}
@@ -2297,7 +2372,7 @@ function openDetail(ref, push = true) {
     } else {
       html += `<h3>Цените навсякъде</h3>${modeBtns}
       <div class="note">${S.cmpStrict
-        ? "Не намерих по-точни съвпадения в друга верига — виж „Подобни продукти“."
+        ? "Няма достатъчно данни за съвпадение по каталог в друга верига — виж „Алтернативи“."
         : "Не намерих подобен продукт в друга верига."}</div>`;
     }
   } else {
@@ -2327,23 +2402,25 @@ function openDetail(ref, push = true) {
   const watching = S.watch.includes(kw);
   const repKey = store + "|" + name;
   let repHtml = "";
-  if (S.cfg && S.cfg.reportUrl) {
+  {
     if (S.reported[repKey]) {
-      repHtml = `<div class="note">✅ Докладът е приет — благодаря!</div>`;
+      repHtml = `<div class="panel" style="grid-column:1/-1;width:100%;min-width:0"><div class="note">Сигналът е записан само на това устройство. Не е изпратен автоматично.</div>
+        <button class="btn" data-repshare="${esc(repKey)}">Сподели сигнала</button>
+        <details><summary>Текст за ръчно копиране</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(reportText(S.reported[repKey]))}</pre></details>
+        <button class="btn ghost" data-repremove="${esc(repKey)}">Изтрий локалния сигнал</button></div>`;
     } else if (S.repOpen === repKey) {
-      repHtml = `<div class="panel"><b>⚠ Какво не е наред?</b>
+      repHtml = `<div class="panel" style="grid-column:1/-1;width:100%;min-width:0"><b>⚠ Какво не е наред?</b>
         <select id="repkind" aria-label="Какво не е наред с цената" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
-          <option value="по-висока">В магазина е по-скъпо</option>
-          <option value="по-ниска">В магазина е по-евтино</option>
-          <option value="изтекла">Промоцията е изтекла</option>
-          <option value="липсва">Продуктът липсва</option>
-          <option value="друго">Друго</option></select>
-        <input id="repprice" inputmode="decimal" aria-label="Реалната цена в магазина" placeholder="реалната цена (по избор)"
+          ${Object.entries(REPORT_KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+        <input id="repprice" inputmode="decimal" aria-label="Цена на етикета в евро" placeholder="Цена на етикета в € (по избор, само при грешна цена)"
           style="width:100%;padding:10px;border-radius:10px;background:var(--panelhi);color:var(--hi);border:1px solid var(--line)">
+        <input id="repnote" maxlength="500" aria-label="Бележка към сигнала" placeholder="Бележка (по избор)" style="width:100%;margin-top:8px">
+        <div class="note">Запазва се само на устройството. После можеш да го споделиш. Не променя публикуваната цена.</div>
+        <div id="reperror" role="alert"></div>
         <button class="btn" style="margin-top:8px" data-repsend="${esc(repKey)}"
-          data-store="${esc(store)}" data-name="${esc(name)}" data-price="${fmt(price)}">Изпрати доклада</button></div>`;
+          data-store="${esc(store)}" data-name="${esc(name)}" data-price="${eur(price)}">Запази на устройството</button></div>`;
     } else {
-      repHtml = `<button class="btn ghost" data-repbtn="${esc(repKey)}">⚠ Цената не е вярна</button>`;
+      repHtml = `<button class="btn ghost" data-repbtn="${esc(repKey)}">⚠ Има грешка</button>`;
     }
   }
   const url = o ? safeUrl(o.url) : "";
@@ -2362,7 +2439,7 @@ function openDetail(ref, push = true) {
     feed("feed/history.json").then(f => {
       S.history = f || { h: {} };
       S.histPending = false;
-      if ($("modal").classList.contains("open") && S.lastRef)
+      if ($("modal").classList.contains("open") && S.lastRef && !S.repOpen)
         openDetail(S.lastRef, false);
     });
   }
@@ -2541,16 +2618,41 @@ document.addEventListener("click", e => {
   if (rb) { S.repOpen = rb.dataset.repbtn; if (S.lastRef) openDetail(S.lastRef, false); return; }
   const rs = e.target.closest("[data-repsend]");
   if (rs) {
-    const f = (S.cfg && S.cfg.reportFields) || {};
-    const body = new URLSearchParams();
-    const vals = { store: rs.dataset.store, product: rs.dataset.name,
-                   shownPrice: rs.dataset.price,
-                   realPrice: $("repprice") ? $("repprice").value : "",
-                   kind: $("repkind") ? $("repkind").value : "" };
-    for (const k in f) if (vals[k] != null) body.append(f[k], vals[k]);
-    fetch(S.cfg.reportUrl, { method: "POST", mode: "no-cors", body }).catch(() => {});
-    S.reported[rs.dataset.repsend] = 1; S.repOpen = false;
+    const kind = $("repkind").value, rawPrice = $("repprice").value.trim();
+    const needsPrice = ["higher","lower"].includes(kind);
+    const realEur = needsPrice && rawPrice ? reportPrice(rawPrice) : null;
+    if (!Object.hasOwn(REPORT_KINDS,kind) || (needsPrice && rawPrice && realEur == null)) {
+      $("reperror").textContent = "Въведи валидна цена в евро, по-голяма от 0 и под 5000, или остави полето празно."; return;
+    }
+    const report = {store:rs.dataset.store,product:rs.dataset.name,shownEur:rs.dataset.price,realEur,kind,note:$("repnote").value.trim().slice(0,500),date:localDay()};
+    const next = {...S.reported,[rs.dataset.repsend]:report};
+    try { localStorage.setItem("pr_reports",JSON.stringify(Object.values(next))); }
+    catch (_) { $("reperror").textContent = "Не успях да запазя. Разреши локалното съхранение и опитай пак."; return; }
+    S.reported = next; S.repOpen = false;
     if (S.lastRef) openDetail(S.lastRef, false);
+    return;
+  }
+  const rr = e.target.closest("[data-repremove]");
+  if (rr) {
+    const next = {...S.reported}; delete next[rr.dataset.repremove];
+    try { localStorage.setItem("pr_reports",JSON.stringify(Object.values(next))); }
+    catch (_) { rr.textContent = "Не успях да изтрия — опитай пак"; return; }
+    S.reported=next; if(S.lastRef) openDetail(S.lastRef,false); return;
+  }
+  const shareReport = e.target.closest("[data-repshare]");
+  if (shareReport) {
+    const r = S.reported[shareReport.dataset.repshare]; if(!r) return;
+    const text = reportText(r);
+    if (navigator.share) navigator.share({text}).catch(err => { if(err.name!=="AbortError") shareReport.textContent="Използвай текста за ръчно копиране"; });
+    else if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(()=>{ shareReport.textContent="Текстът е копиран — изпрати го по избрания канал"; }).catch(()=>{ shareReport.textContent="Използвай текста за ръчно копиране"; });
+    else shareReport.textContent="Отвори „Текст за ръчно копиране“";
+    return;
+  }
+  const resultSort = e.target.closest("[data-resultsort]");
+  if (resultSort) {
+    if(!["relevance","price","unit","distance"].includes(resultSort.dataset.resultsort)) return;
+    S.resultSort=resultSort.dataset.resultsort; S.limit=120; render();
+    if(S.resultSort==="distance" && !S.geoKm && !S.geoBusy) locateNearby();
     return;
   }
   const sug = e.target.closest("[data-addsug]");

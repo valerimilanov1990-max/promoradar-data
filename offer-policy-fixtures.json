@@ -1,0 +1,11 @@
+[
+  {"name":"unknown dates remain visible","from":null,"to":null,"today":"2030-04-10","active":true},
+  {"name":"end date is inclusive","from":"2030-04-01","to":"2030-04-10","today":"2030-04-10","active":true},
+  {"name":"start date is inclusive","from":"2030-04-10","to":null,"today":"2030-04-10","active":true},
+  {"name":"expired excluded","from":null,"to":"2030-04-09","today":"2030-04-10","active":false},
+  {"name":"future excluded","from":"2030-04-11","to":null,"today":"2030-04-10","active":false},
+  {"name":"Bulgarian date parsed","from":"01.04.2030","to":"09.04.2030","today":"2030-04-10","active":false},
+  {"name":"impossible date is unknown","from":null,"to":"31.02.2030","today":"2030-04-10","active":true},
+  {"name":"invalid ISO date is unknown","from":null,"to":"2030-02-31","today":"2030-04-10","active":true},
+  {"name":"timestamp date supported","from":null,"to":"2030-04-09T23:00:00Z","today":"2030-04-10","active":false}
+]

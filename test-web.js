@@ -101,7 +101,8 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "iconOf", "GLYPH", "ICON_FOR", "thumb", "comparableRows",
   "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe",
   "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar",
-  "PHOTO_ASSETS", "PHOTO_FOR", "photoAsset", "photoFamily", "PHOTO_FAMILY_CATEGORIES", "photoEvidence", "indexedPhoto", "photoKey", "isAssortment"];
+  "PHOTO_ASSETS", "PHOTO_FOR", "photoAsset", "photoFamily", "PHOTO_FAMILY_CATEGORIES", "photoEvidence", "indexedPhoto", "photoKey", "isAssortment",
+  "policyDate", "offerActive", "trustText", "sortResults", "sameCatalogueProduct", "catalogueMatches", "reportPrice", "reportText"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -120,6 +121,49 @@ const head = t => console.log(`\n${t}\n${"─".repeat(t.length)}`);
 
 /* ---------- зареждане ---------- */
 function contractTests() {
+head("Offer trust, sorting and local reports");
+for(const row of JSON.parse(fs.readFileSync(path.join(__dirname,"offer-policy-fixtures.json"),"utf8"))) {
+  ok(row.name,ctx.offerActive({validFrom:row.from,validTo:row.to},row.today)===row.active);
+}
+const trustIdx=S.idx; S.idx={updated:"2030-04-01"};
+const trust=ctx.trustText({f:1},"2030-04-10");
+ok("Refresh does not claim price verification",trust.includes("Фийд от") && trust.includes("датата на цената не е потвърдена") && !trust.includes("Цена от"));
+ok("Old data has warning",trust.includes("над 7 дни")); S.idx=trustIdx;
+const sortRows=[{s:"A",n:"kg",p:8,u:4,l:"лв/кг"},{s:"B",n:"litre",p:2,u:1,l:"лв/л"},{s:"C",n:"unknown",p:1,u:.1,l:""},{s:"D",n:"kg cheap",p:3,u:2,l:"лв/кг"}];
+ok("Package-price sorting",ctx.sortResults(sortRows,"price").map(r=>r.s).join()==="C,B,D,A");
+ok("Unit groups remain separate; unknown last",ctx.sortResults(sortRows,"unit").map(r=>r.s).join()==="D,A,B,C");
+ok("Distance unknown last",ctx.sortResults(sortRows,"distance",{A:1,B:5,C:NaN}).map(r=>r.s).join()==="A,B,C,D");
+ok("Relevance order retained",ctx.sortResults(sortRows,"relevance")===sortRows);
+const identity={p:"мляко",b:"Верея",q:"1000мл"};
+ok("Catalogue identity normalized",ctx.sameCatalogueProduct(identity,{...identity,b:" верея "}));
+ok("Catalogue pack/brand required",!ctx.sameCatalogueProduct(identity,{...identity,q:"500мл"}) && !ctx.sameCatalogueProduct(identity,{...identity,b:"Друга"}) && !ctx.sameCatalogueProduct({...identity,q:""},{...identity,q:""}));
+ok("Euro report comma accepted",ctx.reportPrice("2,50")===2.5);
+for(const input of ["","NaN","Infinity","-1","0","5000","1e2","0x10","1,2,3"]) ok("Reject bad report price: "+input,ctx.reportPrice(input)===null);
+ok("Report text includes currency",ctx.reportText({store:"A",product:"Мляко",shownEur:"2.50",realEur:3,kind:"photo",date:"2030-04-10"}).includes("2.50 EUR"));
+ok("No opaque report POST",!JS.includes('fetch(S.cfg.reportUrl'));
+{
+  const saved={reported:S.reported,lastRef:S.lastRef,repOpen:S.repOpen};
+  const savedSet=ctx.localStorage.setItem, savedFetch=ctx.fetch, savedReports=store.pr_reports;
+  let posts=0; ctx.fetch=async()=>{posts++; return {ok:true};};
+  S.reported={}; S.lastRef=null;
+  const button={dataset:{repsend:"QA|Milk",store:"QA",name:"Milk",price:"2.50"}};
+  const click=()=>events.click[0]({target:{id:"",closest:s=>s==="[data-repsend]"?button:null}});
+  try {
+    byId("repkind").value="higher"; byId("repprice").value="-1"; byId("repnote").value="QA";
+    click(); ok("Invalid report is not saved",!S.reported["QA|Milk"] && byId("reperror").textContent.includes("валидна цена"));
+    byId("repprice").value="2,75"; click();
+    ok("Report persisted with EUR and product",JSON.parse(store.pr_reports)[0].realEur===2.75 && S.reported["QA|Milk"].product==="Milk");
+    byId("repkind").value="photo"; byId("repprice").value="-1"; click();
+    ok("Photo report ignores leftover price",S.reported["QA|Milk"].realEur===null);
+    ctx.localStorage.setItem=()=>{throw new Error("quota");};
+    button.dataset.repsend="QA|unsaved"; click();
+    ok("Storage failure does not claim saved",!S.reported["QA|unsaved"] && byId("reperror").textContent.includes("Не успях да запазя"));
+    ok("Saving reports never sends a request",posts===0);
+  } finally {
+    Object.assign(S,saved); ctx.localStorage.setItem=savedSet; ctx.fetch=savedFetch;
+    if(savedReports===undefined) delete store.pr_reports; else store.pr_reports=savedReports;
+  }
+}
 head("10. Общ договор за количества и суми");
 for (const row of JSON.parse(fs.readFileSync(path.join(__dirname, "basket-fixtures.json"), "utf8"))) {
   const quote = ctx.basketQuote({ s:"A", n:"продукт", p:row.price, u:row.unitPrice, l:"лв/"+row.unit },
@@ -157,6 +201,18 @@ Object.assign(S,{nearOnly:true,geoKm:km,nearRadius:10,geoBusy:false});
 ok("Реалният филтър скрива неизвестни и далечни", ctx.isFar("unknown") && ctx.isFar("far") && !ctx.isFar("near"));
 S.geoKm = null;
 ok("Кошницата не връща стари цени при липсваща локация", ctx.comparableRows("мляко").rows.length === 0);
+{
+  const savedView={idx:S.idx,all:S.all,query:S.query,store:S.store,cat:S.cat,watch:S.watch,byUnit:S.byUnit,hidden:S.hidden};
+  Object.assign(S,{idx:{stores:[{name:"near",count:1},{name:"far",count:1},{name:"unknown",count:1}],chains:[]},
+    all:[{store:"near",name:"NEAR QA OFFER",price:4},{store:"far",name:"FAR QA OFFER",price:3},{store:"unknown",name:"UNKNOWN QA OFFER",price:2}],
+    query:"",store:null,cat:null,watch:[],byUnit:false,hidden:new Set(),geoKm:km});
+  const nearHtml=ctx.viewToday();
+  ok("Browse cards respect nearby filter",nearHtml.includes("NEAR QA OFFER") && !nearHtml.includes("FAR QA OFFER") && !nearHtml.includes("UNKNOWN QA OFFER"));
+  S.geoKm=null;
+  const noPosition=ctx.viewToday();
+  ok("Missing position has honest empty state",!noPosition.includes("NEAR QA OFFER") && noPosition.includes("Няма оферти с потвърдено разстояние"));
+  Object.assign(S,savedView);
+}
 Object.assign(S,savedGeo);
 head("11. Снимки и обозначени илюстрации");
 const savedPhotoLabels = S.labels;
