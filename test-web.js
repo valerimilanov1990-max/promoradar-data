@@ -102,7 +102,8 @@ const EXPORTS = ["S", "nameClean", "kindOf", "isAlcohol", "kCompatible", "catOf"
   "suggestFor", "buildSuggest", "basketQuote", "currencyMismatch", "uncertainCurrency", "officialCurrencySafe",
   "withinRadius", "sortBaskets", "validPoint", "haversineKm", "isFar",
   "PHOTO_ASSETS", "PHOTO_FOR", "photoAsset", "photoFamily", "PHOTO_FAMILY_CATEGORIES", "photoEvidence", "indexedPhoto", "photoKey", "isAssortment",
-  "policyDate", "offerActive", "trustText", "sortResults", "sameCatalogueProduct", "catalogueMatches", "reportPrice", "reportText"];
+  "policyDate", "offerActive", "trustText", "sortResults", "sameCatalogueProduct", "catalogueMatches", "reportPrice", "reportText",
+  "coherentSnapshot", "acceptSnapshot", "refreshData", "loadSearch", "dataNotice", "homeSummary", "planBasket", "basketPlanHtml", "watchEligible", "watchTargetPrice", "reportEmail", "catalogueGtin"];
 vm.runInContext(
   JS.replace(/^boot\(\);$/m, "") + `\nvar __X = {${EXPORTS.join(",")}};`,
   ctx, { filename: "index.html" });
@@ -121,6 +122,37 @@ const head = t => console.log(`\n${t}\n${"─".repeat(t.length)}`);
 
 /* ---------- зареждане ---------- */
 function contractTests() {
+head("3.16 Smart basket, target prices and email consent");
+const gtin={productId:'gtin:04006381333931',identityBasis:'gtin-checksum-v1'};
+ok('Valid source GTIN checksum',ctx.catalogueGtin(gtin)===gtin.productId);
+ok('Invalid source GTIN rejected',ctx.catalogueGtin({...gtin,productId:'gtin:04006381333932'})===null);
+ok('Name identity is not barcode proof',ctx.catalogueGtin({...gtin,identityBasis:'source-name-v1'})===null);
+const oldNav={tab:S.tab,list:S.list}; S.list=[];
+events.click[0]({target:{id:'',closest:s=>s==='[data-tab]'?{dataset:{tab:'list'}}:null}});
+ok('Home CTA navigates outside bottom bar',S.tab==='list'); Object.assign(S,oldNav);
+const quote=(s,total,n='Продукт')=>({s,total:total*1.95583,n,packs:1});
+const items=['milk','bread'];
+const per={milk:[quote('A',2),quote('B',5)],bread:[quote('A',6),quote('B',2)]};
+const plan=ctx.planBasket(items,per);
+ok("Full single vs two-store plan",Math.abs(plan.single.total/1.95583-7)<1e-9 && Math.abs(plan.pair.total/1.95583-4)<1e-9 && Math.abs(plan.saving/1.95583-3)<1e-9);
+ok("Smart basket sums displayed EUR cents",Math.abs(ctx.planBasket(['a','b','c','d','e'],Object.fromEntries(['a','b','c','d','e'].map(i=>[i,[quote('A',.97)]]))).single.total/1.95583-4.85)<1e-9);
+ok("Pair assigns each product once",plan.pair.picks.length===2 && new Set(plan.pair.picks.map(h=>h.item)).size===2);
+ok("No saving without full single baseline",ctx.planBasket(items,{milk:[quote('A',2)],bread:[quote('B',3)]}).saving===null);
+ok("Three-store-only coverage not advertised",ctx.planBasket(['x','y','z'],{x:[quote('A',1)],y:[quote('B',1)],z:[quote('C',1)]}).pair===null);
+ok("Tie prefers one store",ctx.planBasket(items,{milk:[quote('A',2),quote('B',2)],bread:[quote('A',2),quote('B',2)]}).pair===null);
+ok("Missing product not a zero-price saving",ctx.planBasket(items,{milk:[quote('A',2)]}).single===null);
+ok("Invalid prices excluded",ctx.planBasket(['x'],{x:[quote('A',NaN),quote('B',-2)]}).single===null);
+ok("Empty basket has no plan",ctx.planBasket([],{}).single===null);
+ok("Target admits regular price",ctx.watchEligible({p:1.95583*5,f:1},5));
+ok("Target rejects above threshold",!ctx.watchEligible({p:1.95583*5.01},5));
+ok("Target excludes card prices",!ctx.watchEligible({p:1,requiresCard:true},5));
+ok("Targets accept EUR cents, not sub-cent limits",ctx.watchTargetPrice('18,00')===18 && ctx.watchTargetPrice('0.001')===null && ctx.watchTargetPrice('6.009')===null);
+ok("Target does not reinterpret explicit EUR as BGN",!ctx.watchEligible({p:8,currency:'EUR'},5));
+ok("Target never advertises rounded zero-price matches",!ctx.watchEligible({p:0.001},5));
+ok("No target requires discount",!ctx.watchEligible({p:1,f:1},null) && ctx.watchEligible({p:1,o:2,f:0},null));
+const email=ctx.reportEmail({store:'A',product:'Milk\nBcc:bad@example.com',shownEur:'2.50',note:'&subject=evil',date:'2030-04-10'});
+ok("Email recipient is fixed and body encoded",email.startsWith('mailto:Valeri.Milanov@aisolutions.bg?subject=') && !email.includes('\n') && !email.includes('&subject=evil'));
+ok("Reports never claim automatic email delivery",HTML.includes('ти преглеждаш и изпращаш') && HTML.includes('Не е потвърждение за получен сигнал'));
 head("Offer trust, sorting and local reports");
 for(const row of JSON.parse(fs.readFileSync(path.join(__dirname,"offer-policy-fixtures.json"),"utf8"))) {
   ok(row.name,ctx.offerActive({validFrom:row.from,validTo:row.to},row.today)===row.active);
@@ -271,8 +303,67 @@ ok("Счупен линк преминава към локална илюстр�
 failImage(); failImage();
 ok("Последната резерва не създава цикъл от грешки", failedImg.removed === true);
 }
+async function reliabilityTests() {
+  head('Coherent loading and last-good fallback');
+  const old={...S}, oldFetch=ctx.fetch, oldCaches=ctx.caches;
+  const idx={updated:'2030-04-10',stores:[{slug:'qa',name:'QA',count:1}],chains:['QA'],top:[]};
+  const search={updated:idx.updated,items:[{s:'QA',n:'Кафе тест',p:4,currency:'BGN'}]};
+  const offers={updated:idx.updated,offers:[{store:'QA',name:'Кафе тест',price:4,currency:'BGN'}]};
+  ok('Matching complete generation accepted',ctx.coherentSnapshot(idx,search,[offers]));
+  ok('Mismatched search rejected',!ctx.coherentSnapshot(idx,{...search,updated:'old'},[offers]));
+  ok('Mismatched store rejected',!ctx.coherentSnapshot(idx,search,[{...offers,updated:'old'}]));
+  ok('Empty search cannot replace good data',!ctx.coherentSnapshot(idx,{...search,items:[]},[offers]));
+  ok('Missing store cannot replace good data',!ctx.coherentSnapshot(idx,search,[]));
+  ok('Partial store cannot replace good data',!ctx.coherentSnapshot({...idx,stores:[{...idx.stores[0],count:5}]},search,[offers]));
+  ok('Malformed row cannot replace good data',!ctx.coherentSnapshot(idx,{...search,items:[null]},[offers]));
+  ok('Fresh snapshot requests never silently use per-file SW cache',fs.readFileSync(path.join(__dirname,'sw.js'),'utf8').includes("searchParams.has('pr') ? Response.error()"));
+  try {
+    S.tab='today'; S.query='кафе'; S.dataLoading=false; S.search=null; S.idx=null;
+    let writes=0; ctx.Response=class { constructor(body){this.body=body;} };
+    ctx.caches={open:async()=>({put:async()=>{writes++;},match:async()=>null})};
+    ctx.fetch=async url=>({ok:true,json:async()=>url.includes('index.json')?idx:url.includes('search.json')?search:offers});
+    await ctx.refreshData();
+    ok('Search visible even typed during loading',S.search.length===1 && !S.dataLoading && !S.dataError && byId('view').innerHTML.includes('Кафе тест'));
+    ok('Only a complete snapshot is backed up',writes===1);
+    ctx.fetch=async()=>{throw Error('offline');};
+    await ctx.refreshData();
+    ok('Offline refresh keeps last-good search',S.search.length===1 && S.dataStale && S.dataError.includes('не означава'));
+    ok('Failed refresh never overwrites backup',writes===1);
+    ok('Failed load offers retry not false empty',ctx.dataNotice().includes('Опитай отново'));
+    S.search=null; S.idx=null;
+    ctx.caches={open:async()=>({match:async()=>({json:async()=>({idx,search,stores:[offers]})})})};
+    await ctx.refreshData();
+    ok('Restart restores complete offline snapshot',S.search.length===1 && S.dataStale);
+    S.search=null; S.idx=null; S.perItem=null; S.ranking=null;
+    ctx.caches={open:async()=>({match:async()=>null})};
+    let standaloneRequests=0;
+    ctx.fetch=async url=>{
+      if (url.includes('search.json')) { standaloneRequests++; return {ok:true,json:async()=>search}; }
+      return {ok:false};
+    };
+    await ctx.loadSearch();
+    ok('Search cannot bypass a missing generation index',S.search===null && standaloneRequests===0);
+    S.list=['кафе'];
+    await ctx.rank();
+    ok('Basket stays unknown without an accepted snapshot',S.search===null && S.ranking===null && S.perItem===null);
+    ctx.fetch=async url=>({ok:!url.includes('offers-'),json:async()=>url.includes('index.json')?idx:search});
+    await ctx.loadSearch();
+    ok('Search cannot bypass a missing store shard',S.search===null && S.idx===null);
+    let release, indexRequests=0;
+    const gate=new Promise(resolve=>{release=resolve;});
+    ctx.fetch=async url=>{
+      if (url.includes('index.json')) indexRequests++;
+      await gate;
+      return {ok:true,json:async()=>url.includes('index.json')?idx:url.includes('search.json')?search:offers};
+    };
+    const refresh=ctx.refreshData(), requested=ctx.loadSearch();
+    release();
+    const results=await Promise.all([refresh,requested]);
+    ok('Concurrent search joins the single snapshot refresh',indexRequests===1 && results[1]===S.search && S.search.length===1);
+  } finally { Object.assign(S,old); ctx.fetch=oldFetch; ctx.caches=oldCaches; }
+}
 async function main() {
-if (process.argv.includes("--contract-only")) { contractTests(); console.log(pass+" passed; "+fail+" failed"); process.exit(fail ? 1 : 0); }
+if (process.argv.includes("--contract-only")) { contractTests(); await reliabilityTests(); console.log(pass+" passed; "+fail+" failed"); process.exit(fail ? 1 : 0); }
 await ensureFeed();
 const t0 = Date.now();
 S.idx = rd("index.json");

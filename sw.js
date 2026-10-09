@@ -17,7 +17,7 @@
 */
 "use strict";
 
-const VERSION = "v3.15-trust-sorting-local-reports";
+const VERSION = "v3.16-reliable-smart-basket-targets";
 const SHELL = "promoradar-shell-" + VERSION;
 const DATA = "promoradar-data-" + VERSION;
 const PHOTO_FILES = "coffee milk cheese eggs bread pantry fruit veg meat fish sweets drinks tea care clean pet generic"
@@ -66,18 +66,21 @@ self.addEventListener("fetch", e => {
       return r;
     })));
   } else if (url.includes("raw.githubusercontent.com")) {
+    const canonical = new URL(url); canonical.searchParams.delete("pr");
+    const cacheKey = canonical.href;
     // данните: мрежата първо (свежи цени), кешът при липса на обхват
     e.respondWith(
       fetch(req).then(r => {
         if (r.ok) {
           const copy = r.clone();
           e.waitUntil(caches.open(DATA)
-            .then(c => c.put(req, copy))
+            .then(c => c.put(cacheKey, copy))
             .then(() => trim(DATA, DATA_MAX))
             .catch(() => {}));
         }
+        if (!r.ok) throw new Error('Feed unavailable');
         return r;
-      }).catch(() => caches.match(req).then(hit => hit || Response.error()))
+      }).catch(() => new URL(url).searchParams.has('pr') ? Response.error() : caches.match(cacheKey).then(hit => hit || Response.error()))
     );
   } else if (req.mode === "navigate" || url.endsWith("/index.html")) {
     // черупката: кешът първо (мигновено отваряне), обновяване на заден план

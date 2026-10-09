@@ -186,17 +186,18 @@
       "enabled": true,
       "max_pages": 12,
       "urls": [
-        "https://www.ebag.bg/promo",
+        "https://ebag.bg/offers?mode=promo",
         "https://www.ebag.bg/"
       ],
       "keywords": [
+        "offers",
         "promo",
         "oferti",
         "namaleni",
         "/c/",
         "kategoriya"
       ],
-      "_": "Онлайн супермаркет с истински плочки и цени — най-сигурният нов източник."
+      "_": "Седмични промоции: /offers?mode=promo, потвърден от публичната навигация на eBag на 09.10.2026. Старият /promo вече е страница 404."
     }
   ],
   "max_basics_per_chain": 1200,

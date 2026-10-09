@@ -140,11 +140,11 @@ class PublicationTests(unittest.TestCase):
         row = {"s": "a", "n": "Мляко 1л", "p": .97, "f": 1,
                "sourcePrice": .97, "sourceCurrency": "EUR", "sourceDate": "2026-09-08",
                "normalization": "kzp-currency-v1"}
-        self.write("feed/search.json", {"updated": "2026-09-09", "items": [row]})
+        self.write("feed/search.json", {"updated": "2026-09-09", "items": [{"n": "Мляко", "p": 2, "currency": "BGN"}, row]})
         self.write("feed/basics.json", {"updated": "2026-09-09", "basics": [{"chain": "a", "product": "Мляко 1л", "price": .97}]})
         self.assertTrue(any("conversion mismatch" in e for e in validate(self.root)))
         row["p"] = 1.90
-        self.write("feed/search.json", {"updated": "2026-09-09", "items": [row]})
+        self.write("feed/search.json", {"updated": "2026-09-09", "items": [{"n": "Мляко", "p": 2, "currency": "BGN"}, row]})
         self.write("feed/basics.json", {"updated": "2026-09-09", "basics": [{"chain": "a", "product": "Мляко 1л", "price": 1.90}]})
         self.assertEqual(validate(self.root), [])
 

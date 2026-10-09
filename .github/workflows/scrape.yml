@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'scraper.py'
+      - 'catalogue.py'
+      - 'test_catalogue.py'
       - 'validate_feed.py'
       - 'test_pipeline.py'
       - '.github/workflows/scrape.yml'
@@ -68,7 +70,7 @@ jobs:
 
       - name: Regression tests and publication gates
         run: |
-          python -m unittest test_pipeline.py
+          python -m unittest test_pipeline.py test_catalogue.py
           node test-web.js --contract-only
           python validate_feed.py . "$RUNNER_TEMP/feed-baseline"
 

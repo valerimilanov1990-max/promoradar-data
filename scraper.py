@@ -24,6 +24,7 @@ import traceback
 import zipfile
 
 import requests
+from catalogue import assert_publishable_output, attach_identities, identity_fields, strip_advertising_suffix
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
@@ -236,7 +237,7 @@ def enrich(item):
     """
     name = item.get("name") or item.get("product", "")
     item["currency"] = "BGN"  # storage contract; clients display EUR
-    item["requiresCard"] = bool(re.search(r"card|xtra|plus|купон|с карта", name, re.I))
+    item["requiresCard"] = bool(item.get("requiresCard") or re.search(r"card|xtra|plus|купон|с карта", name, re.I))
     item.setdefault("validFrom", None)
     item.setdefault("validTo", None)
     up = unit_price(item.get("price"), name)
@@ -274,6 +275,7 @@ JUNK_NAME_RE = re.compile(
     r"|нови\s+продукти\b|всички\s+продукти\b"
     r"|разгледай|каталог\b|брошура\b|листовк"
     r"|абонирай|бюлетин\b"
+    r"|отстъпка(?:\s|кг|[-–—]|$)"
     # Открити при подреждането по категории: dm ги показва като плочки
     r"|информация\s+за\s+продукт|налично\s+за\s+доставка"
     r"|не\s+е\s+налично|кошница\s+с\s+грижа)", re.IGNORECASE)
@@ -375,6 +377,7 @@ def clean_name(name):
     s = re.sub(r"\s+", " ", name or "").strip()
     if not s:
         return s
+    s = strip_advertising_suffix(s)
     for _ in range(3):
         before = s
         s = _GLUE_CASE.sub(r"\1 \2", s)
@@ -402,6 +405,10 @@ def clean_name(name):
     # вече я има в собствено поле, а в името тя разваля и търсенето, и
     # сравнението („2.29“ не е част от стоката).
     s = _PRICE_TAIL.sub("", s)
+
+    # Glued tails such as "отстъпкакг" become recognizable only after the
+    # word/unit cleanup above. Remove them without losing the product name.
+    s = strip_advertising_suffix(s)
 
     out = re.sub(r"\s+", " ", s).strip(" -–—·,")
     # Предпазител: ако правилата са изяли смисъла, връщаме оригинала.
@@ -445,7 +452,12 @@ def clean_offer(o):
         o["img"] = ""
     # Последна защита: каквото и да е дошло от кой да е източник,
     # името се разлепя тук, преди да влезе във фийда.
+    raw_name = o.get("rawName") or o.get("name") or ""
+    o["requiresCard"] = bool(o.get("requiresCard") or re.search(r"card|xtra|plus|купон|с карта", raw_name, re.I))
     n = clean_name(o.get("name") or "")
+    if n != raw_name:
+        # Preserve source text for the currency guard and traceability.
+        o["rawName"] = raw_name
     if n:
         o["name"] = n[:90]
     old, price = o.get("old"), o.get("price")
@@ -1130,7 +1142,8 @@ def _harvest(ctx, store, url, keywords=()):
             prices = [x for x in prices if 0.1 <= x <= 5000]
             if not prices:
                 continue
-            name = clean_name(it.get("name") or "")
+            raw_name = it.get("name") or ""
+            name = clean_name(raw_name)
             if sum(c.isalpha() for c in name) < 5:
                 continue
             price, old = pick_price_pair(prices, it.get("pct"))
@@ -1138,6 +1151,8 @@ def _harvest(ctx, store, url, keywords=()):
                 continue
             rec = {
                 "store": store, "name": name[:90], "price": round(price, 2),
+                "rawName": raw_name,
+                "requiresCard": bool(re.search(r"card|xtra|plus|купон|с карта", raw_name, re.I)),
                 "old": round(old, 2) if old else None,
                 "img": (it.get("img") or "")[:300],
                 "url": (it.get("url") or "")[:300],
@@ -1740,7 +1755,9 @@ def scrape_community():
 
         rec = {"chain": shop[:40], "product": name[:90], "price": round(price, 2),
                "town": cell("town")[:30], "date": d,
-               "barcode": re.sub(r"\D", "", cell("barcode"))[:14],
+               # Keep the supplied value intact: stripping/truncating it can
+               # turn an invalid barcode into a different valid identifier.
+               "barcode": cell("barcode"),
                "src": "shop" if "магазин" in cell("role").lower() else "user"}
         qty = cell("qty")
         u = unit_price(rec["price"], f"{name} {qty}".strip())
@@ -2603,6 +2620,8 @@ def write_output():
     """
     import os
     sizes = {}
+    assert_publishable_output(OUT)
+    attach_identities(OUT)
 
     # --- по вериги ---
     stores = []
@@ -2686,7 +2705,8 @@ def write_output():
                     "currency": "BGN", "qty": o.get("qty"),
                     "qtyUnit": o.get("qtyUnit", ""),
                     "requiresCard": o.get("requiresCard"),
-                    "validFrom": o.get("validFrom"), "validTo": o.get("validTo")})
+                    "validFrom": o.get("validFrom"), "validTo": o.get("validTo"),
+                    **identity_fields(o)})
     for b in OUT["basics"]:
         idx.append({"s": b["chain"], "n": b["product"], "p": b["price"],
                     "o": None, "u": b.get("unitPrice"),
@@ -2696,11 +2716,11 @@ def write_output():
                     "sourcePrice": b.get("sourcePrice"),
                     "sourceCurrency": b.get("sourceCurrency"),
                     "sourceDate": b.get("sourceDate"),
-                    "normalization": b.get("normalization")})
+                    "normalization": b.get("normalization"), **identity_fields(b)})
     for c in OUT["community"]:
         idx.append({"s": c["chain"], "n": c["product"], "p": c["price"],
                     "o": None, "u": c.get("unitPrice"),
-                    "l": c.get("unitLabel", ""), "f": 2})
+                    "l": c.get("unitLabel", ""), "f": 2, **identity_fields(c)})
     sizes["search"] = _dump("feed/search.json",
                             {"updated": OUT["updated"], "items": idx})
 
@@ -2739,7 +2759,7 @@ def write_output():
 
 def publication_exclusion(row):
     """Quarantine uncertain prices; never guess their currency from a name."""
-    name = str(row.get("name") or row.get("product") or "")
+    name = str(row.get("rawName") or row.get("name") or row.get("product") or "")
     if re.search(r"(?<![\w])(?:цигар\w*|тютюн\w*|никотин\w*|вейп\w*|"
                  r"cigarettes?|tobacco|nicotine|vapes?|heets|terea|iqos|"
                  r"marlboro|winston|rothmans|merilyn|мерилин|dunhill|"
@@ -2748,7 +2768,8 @@ def publication_exclusion(row):
                  r"(?![\w])", name, re.I):
         return "restricted_tobacco_nicotine"
     price = row.get("price")
-    if not isinstance(price, (int, float)):
+    if (not isinstance(price, (int, float)) or isinstance(price, bool)
+            or not 0 < price <= 5000):
         return "invalid_price"
     eur = [float(x.replace(',', '.')) for x in re.findall(
         r"(\d+[.,]\d{2})\s*(?:€|EUR)", name, re.I)]

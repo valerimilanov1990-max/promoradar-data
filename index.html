@@ -320,13 +320,16 @@ const eur = v => (v / EUR).toFixed(2);
 
 /* ---------- зареждане с резервен клон и кеш в паметта ---------- */
 const cache = {};
-async function feed(path) {
-  if (cache[path]) return cache[path];
+async function feed(path, fresh = false) {
+  if (!fresh && cache[path]) return cache[path];
   for (const b of BASES) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const deadline = controller ? setTimeout(() => controller.abort(),15000) : null;
     try {
-      const r = await fetch(b + "/" + path, { cache: "no-cache" });
+      const r = await fetch(b + "/" + path + (fresh ? "?pr=" + Date.now() : ""), { cache: "no-cache", ...(controller ? {signal:controller.signal} : {}) });
       if (r.ok) { const j = await r.json(); cache[path] = j; return j; }
     } catch (e) { /* пробваме следващия клон */ }
+    finally { if (deadline) clearTimeout(deadline); }
   }
   return null;
 }
@@ -1362,7 +1365,8 @@ const S = {
   seen: new Set(readArr("pr_seen")),
   ranking: null, perItem: null, chosen: null, busy: false,
   cfg: null, reported: Object.fromEntries(readArr("pr_reports").filter(r => r && typeof r.store === "string" && typeof r.product === "string").map(r => [r.store + "|" + r.product,r])), repOpen: false,
-  resultSort: "relevance",
+  resultSort: "relevance", dataLoading: false, dataError: "", dataStale: false,
+  watchTargets: Object.fromEntries(readArr("pr_targets").filter(x => Array.isArray(x) && x.length === 2)),
   labels: null, labelAliases: 0,
   detailStack: [], lastRef: null, histPushed: false,
   hidden: new Set(readArr("pr_hidden")),
@@ -1446,27 +1450,93 @@ async function boot() {
     if (S.digest && !S.query) render();
   });
 
-  S.idx = await feed("feed/index.json");
+  await refreshData();
+  await pLabels;
   render();
-  if (!S.idx) return;
-  const pSearch = loadSearch().then(x => { S.search = x || []; });
+}
 
-  // Всички магазини наведнъж, не един по един.
-  const files = await Promise.all(
-    S.idx.stores.map(st => feed("feed/offers-" + st.slug + ".json")));
-  const acc = [];
-  for (const f of files)
-    if (f && f.updated === S.idx.updated && f.offers) for (const o of f.offers)
-      if (!isJunk(o)) {
-        o.rawName = o.name;
-        o.requiresCard = o.requiresCard ?? /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(o.name);
-        o.name = nameClean(o.name); acc.push(o);
+// Treat a generation as one snapshot. Never turn a failed/mixed download into
+// a successful empty catalogue, or replace the last complete snapshot with it.
+function coherentSnapshot(idx, search, stores) {
+  const validRow = (r,name,price,store) => r && typeof r[name] === 'string' && r[name].trim() &&
+    typeof r[store] === 'string' && r[store].trim() && Number.isFinite(r[price]) && r[price]>0;
+  return !!(idx && typeof idx.updated === "string" && idx.updated &&
+    Array.isArray(idx.stores) && idx.stores.length &&
+    idx.stores.every(s => s && /^[a-z0-9_-]+$/i.test(s.slug) && typeof s.name === 'string' && Number.isInteger(s.count) && s.count>=0) &&
+    search && search.updated === idx.updated && Array.isArray(search.items) && search.items.length &&
+    search.items.every(r => validRow(r,'n','p','s')) &&
+    Array.isArray(stores) && stores.length === idx.stores.length &&
+    stores.every((f,i) => f && f.updated === idx.updated && Array.isArray(f.offers) &&
+      idx.stores[i].count === f.offers.length && f.offers.every(r => validRow(r,'name','price','store') && r.store===idx.stores[i].name)));
+}
+function acceptSnapshot(snapshot) {
+  const {idx,search,stores} = snapshot;
+  if (!coherentSnapshot(idx,search,stores)) return false;
+  const rows = search.items.filter(it => it.n && officialCurrencySafe(it) &&
+    !uncertainCurrency(it.s,it.n,it.p,it.o,null,it.currency)).map(it => cleanRow({...it}));
+  if (!rows.length) return false;
+  const all = stores.flatMap(f => f.offers).filter(o => !isJunk(o)).map(o => ({...o,
+    rawName:o.rawName || o.name, name:nameClean(o.name),
+    requiresCard:o.requiresCard ?? /card|xtra|plus|купон|с карта|\d\s*\+\s*\d/i.test(o.name)}));
+  S.idx = idx; S.search = rows;
+  S.all = [...new Map(all.map(o=>[o.store+'|'+o.name+'|'+o.price,o])).values()];
+  SUGGEST = null; _cmpCache.clear(); S.ranking = null; S.perItem = null;
+  return true;
+}
+let snapshotRefresh = null;
+async function refreshData() {
+  if (snapshotRefresh) return snapshotRefresh;
+  snapshotRefresh = refreshDataInner();
+  try { return await snapshotRefresh; } finally { snapshotRefresh = null; }
+}
+async function refreshDataInner() {
+  if (S.dataLoading) return;
+  S.dataLoading = true; S.dataError = ""; render();
+  try {
+    for (let attempt=0;attempt<2;attempt++) {
+      const idx = await feed("feed/index.json",true);
+      if (!idx || !Array.isArray(idx.stores) || !idx.stores.length) continue;
+      const [search,stores] = await Promise.all([
+        feed("feed/search.json",true),
+        Promise.all(idx.stores.map(st => feed("feed/offers-"+st.slug+".json",true)))
+      ]);
+      const snapshot = {idx,search,stores};
+      if (!acceptSnapshot(snapshot)) continue;
+      S.dataStale = false;
+      if (typeof caches !== "undefined") {
+        try { await (await caches.open("pr-complete-snapshot-v1")).put("./last-complete-feed",new Response(JSON.stringify(snapshot))); } catch (_) {}
       }
-  S.all = acc;
-  await pLabels;            // категориите са верни още при първото рисуване
-  render();
-  await pSearch;
-  if (!S.query) render();
+      return;
+    }
+    S.dataError = "Не успях да заредя съгласувани данни за цените. Това не означава, че няма продукти.";
+    if (S.search?.length) S.dataStale = true;
+    else if (typeof caches !== "undefined") {
+      try {
+        const saved = await (await caches.open("pr-complete-snapshot-v1")).match("./last-complete-feed");
+        if (saved && acceptSnapshot(await saved.json())) S.dataStale = true;
+      } catch (_) {}
+    }
+  } catch (_) {
+    S.dataError = "Проблем при зареждането. Запазената кошница не е изтрита.";
+    if (S.search?.length) S.dataStale = true;
+    else if (typeof caches !== 'undefined') {
+      try {
+        const saved=await (await caches.open('pr-complete-snapshot-v1')).match('./last-complete-feed');
+        if (saved && acceptSnapshot(await saved.json())) S.dataStale=true;
+      } catch (_) {}
+    }
+  }
+  finally {
+    S.dataLoading = false; render();
+    if (S.tab === 'list' && S.list.length && S.search?.length && !S.ranking && !S.busy) rank();
+  }
+}
+function dataNotice() {
+  if (S.dataLoading) return '<div class="panel" role="status">Обновявам цените…</div>';
+  if (!S.dataError && !S.dataStale) return '';
+  return `<div class="panel" role="status"><b>${S.dataStale ? "Показвам последните успешно заредени данни" : "Цените не се заредиха"}</b>
+    <p>${esc(S.dataError)}</p>${S.dataStale && S.idx ? `<p>Данни от ${esc(S.idx.updated)}. Цените може да са променени.</p>` : ''}
+    <button class="btn" data-refresh>Опитай отново</button></div>`;
 }
 /* Мостът към етикетите. Те са записани по СУРОВОТО име от тръбопровода
    („омарот нашата витринакг-20% отстъпка с“), а тук имената вече са
@@ -1491,9 +1561,10 @@ function applyLabels(f) {
    пропускаше и филтъра, и почистването — тоест докато то беше активно,
    подсказките показваха слепени имена и добавяха „Омарот“ в списъка. */
 async function loadSearch() {
-  const f = await feed("feed/search.json");
-  if (f && S.idx && f.updated !== S.idx.updated) return null;
-  return f ? f.items.filter(it => it.n && officialCurrencySafe(it) && !uncertainCurrency(it.s, it.n, it.p, it.o, null, it.currency)).map(cleanRow) : null;
+  // No caller may promote an independently fetched shard into the live catalogue.
+  // Join the same in-flight generation used by boot/refresh, including its backup fallback.
+  if (!S.search?.length) await refreshData();
+  return S.search?.length ? S.search : null;
 }
 function officialCurrencySafe(it) {
   // Never show the old EUR-as-BGN official feed, including offline fallback.
@@ -1580,10 +1651,16 @@ function sameCatalogueProduct(a,b) {
   const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g," ");
   return !!(a && b && norm(a.p) && norm(a.b) && norm(a.q) && ["p","b","q"].every(k => norm(a[k])===norm(b[k])));
 }
-function catalogueMatches(name) {
-  const label = labelFor(name), stores = new Map();
+function catalogueGtin(row) {
+  if (row?.identityBasis !== 'gtin-checksum-v1' || !/^gtin:\d{14}$/.test(row.productId || '')) return null;
+  const digits=row.productId.slice(5); if (/^0+$/.test(digits)) return null;
+  const sum=[...digits.slice(0,-1)].reverse().reduce((s,d,i)=>s+Number(d)*(i%2===0?3:1),0);
+  return (10-sum%10)%10===Number(digits[13]) ? row.productId : null;
+}
+function catalogueMatches(name, source = null) {
+  const label = labelFor(name), stores = new Map(), gtin=catalogueGtin(source);
   for (const h of S.search || []) {
-    if (!offerActive(h) || !Number.isFinite(h.p) || h.p <= 0 || h.requiresCard || S.hidden.has(h.s) || isFar(h.s) || !sameCatalogueProduct(label,labelFor(h.n))) continue;
+    if (!offerActive(h) || !Number.isFinite(h.p) || h.p <= 0 || h.requiresCard || S.hidden.has(h.s) || isFar(h.s) || !(gtin ? catalogueGtin(h)===gtin : sameCatalogueProduct(label,labelFor(h.n)))) continue;
     if (!stores.has(h.s) || h.p < stores.get(h.s).p) stores.set(h.s,h);
   }
   return [...stores.values()].sort((a,b)=>a.p-b.p);
@@ -1597,6 +1674,9 @@ function reportPrice(value) {
 }
 function reportText(r) {
   return `Сигнал за Промо Радар\nМагазин: ${r.store}\nПродукт: ${r.product}\nПоказана цена: ${r.shownEur} EUR\nЦена на етикета: ${r.realEur ?? "не е въведена"}${r.realEur == null ? "" : " EUR"}\nГрешка: ${REPORT_KINDS[r.kind] || "Друго"}\nБележка: ${r.note || "—"}\nДата: ${r.date}`;
+}
+function reportEmail(r) {
+  return 'mailto:Valeri.Milanov@aisolutions.bg?subject=' + encodeURIComponent('Промо Радар — сигнал за проверка') + '&body=' + encodeURIComponent(reportText(r));
 }
 function render() {
   $("view").innerHTML = S.tab === "today" ? viewToday()
@@ -1650,18 +1730,38 @@ function hitRow(h) {
   </div>`;
 }
 
+function homeSummary() {
+  const count = S.list.length;
+  const full = (S.ranking || []).filter(r => r[2] === count).sort((a,b) => a[1]-b[1]);
+  const checked = S.list.filter(x => S.checked.has(x)).length;
+  return `<div class="home-intro"><span>ТВОЕТО ПАЗАРУВАНЕ</span><h2>${count ? "Списъкът е готов.<br>Избери къде." : "Какво ще купуваш<br>тази седмица?"}</h2>
+    <button class="home-list" data-tab="list">${count ? `Кошница · ${count} ${count === 1 ? 'продукт' : 'продукта'}${checked ? ` · ${checked} отметнати` : ''}` : 'Създай твоята кошница'} <span aria-hidden="true">↗</span></button>
+    <div class="note">${full.length ? `Ориентир: ${eur(full[0][1])} € в ${esc(full[0][0])} за целия списък.` : count ? 'Сравни целия списък в един или два магазина. Без измислена икономия при липсващи продукти.' : 'Добави количества и сравни цените за целия списък.'}</div>
+    <div class="chips">${['мляко','яйца','кафе'].map(q => `<button class="chip" data-sug="${q}">Търси ${q}</button>`).join('')}<button class="chip" data-refresh>Обнови цените</button></div></div>`;
+}
+function watchEligible(hit,target) {
+  if (!Number.isFinite(hit.p) || hit.p <= 0 || (hit.currency && hit.currency !== 'BGN') || hit.requiresCard || !offerActive(hit)) return false;
+  const cents = Math.round(hit.p/EUR*100);
+  return Number.isFinite(target) && target>=0.01 && target<5000
+    ? cents >= 1 && cents <= Math.round(target*100)
+    : (hit.f == null || hit.f === 0) && hit.o > hit.p;
+}
+function watchTargetPrice(value) {
+  const text = String(value).trim().replace(',','.');
+  return /^\d+(\.\d{1,2})?$/.test(text) ? reportPrice(text) : null;
+}
 function viewToday() {
-  if (!S.idx) return `<div class="note">Зареждам фийда… Ако това не изчезне, провери връзката.</div>`;
+  if (!S.idx) return dataNotice() || `<div class="panel">Зареждам цените… <button class="btn" data-refresh>Опитай отново</button></div>`;
   const q = S.query.trim();
   const upd8 = S.swUpdated
     ? `<div class="panel" style="border:1px solid var(--mint55)">🆕 Има нова версия на сайта.
        <button class="chip" data-reload style="margin-left:8px">Презареди</button></div>` : "";
 
-  let head = `${q.length < 2 ? '<div class="home-intro"><span>ПАЗАРУВАЙ С ЯСНА СМЕТКА</span><h2>Добрите покупки<br>започват оттук.</h2><button class="home-list" data-tab="list">' + (S.list.length ? "Твоята кошница · " + S.list.length + " продукта" : "Създай твоята кошница") + ' <span aria-hidden="true">↗</span></button></div>' : ""}<div class="search"><input id="q" type="search" aria-label="Търси във всички магазини" placeholder="Търси във всички магазини…" value="${esc(S.query)}"></div>`;
+  let head = dataNotice() + `${q.length < 2 ? homeSummary() : ""}<div class="search"><input id="q" type="search" aria-label="Търси във всички магазини" placeholder="Търси продукт, марка или разфасовка…" value="${esc(S.query)}"></div>`;
 
   if (S.nearOnly || S.resultSort === "distance") head += nearbyControls();
   if (q.length >= 2) {
-    if (!S.search) return head + `<div class="note">Зареждам индекса за търсене…</div>`;
+    if (!S.search) return head + (S.dataError ? '' : `<div class="note">Зареждам индекса за търсене…</div>`);
     // Подсказките стоят НАД резултатите, а не вместо тях: пишеш и виждаш
     // едновременно какво намира сега и какво друго може да имаш предвид.
     const sug = S.sugOff === q ? [] : suggestFor(q);
@@ -1730,19 +1830,20 @@ function viewToday() {
   if (S.watch.length && S.search) {
     const rows = [];
     for (const kw of S.watch) {
-      const hit = searchIn(S.search, kw, 40, true)
-        .filter(h => (h.f == null || h.f === 0) && h.o && h.o > h.p)[0];
+      const target = S.watchTargets[kw];
+      const hit = searchIn(S.search, kw, Infinity, true)
+        .filter(h => watchEligible(h,target)).sort((a,b) => a.p-b.p)[0];
       const key = hit ? hit.s + "|" + hit.n + "|" + hit.p : "";
       const fresh = hit && !S.seen.has(key);
       if (fresh) { S.seen.add(key); saveWatch(); }
       rows.push(`<div class="rrow" style="display:flex;gap:8px;align-items:center">
         <div style="flex:1;min-width:0">
-          <b>${esc(kw)}</b> ${hit
+          <b>${esc(kw)}</b>${target ? ` · до ${Number(target).toFixed(2)} €/опак.` : ''} ${hit
             ? `${fresh ? '<span class="pill mintf">ново</span> ' : ""}- ${esc(hit.n.slice(0, 36))} · <b style="color:var(--coral)">${eur(hit.p)} €</b> в ${esc(hit.s)}`
-            : "- няма намаление в момента"}</div>
+            : target ? "- няма цена под зададения праг" : "- няма намаление в момента"}</div>
         <button class="chip" data-unwatch="${esc(kw)}" aria-label="Спри да следиш ${esc(kw)}">🔕</button></div>`);
     }
-    watchHtml = `<div class="panel"><b>🔔 Следени думи</b>${rows.join("")}</div>`;
+    watchHtml = `<div class="panel"><b>🔔 Твоят радар</b><div class="note">Избраните магазини и активният радиус важат и тук. Цени с карта са изключени. Проверка при отваряне, не фонови известия.</div>${rows.join("")}</div>`;
   }
 
   const present = {};
@@ -1880,9 +1981,41 @@ const QUICK_ITEMS = ["прясно мляко", "кисело мляко", "хл
   "захар", "брашно", "ориз", "кашкавал", "сирене", "домати", "картофи",
   "боб", "макарони", "лютеница", "кафе"];
 
+function planBasket(items, perItem) {
+  if (!items.length) return {single:null,pair:null,saving:null};
+  const offers = items.map(item => (perItem[item] || []).filter(h => h.s && Number.isFinite(h.total) && h.total>0 && Number.isFinite(h.packs) && h.packs>0));
+  const stores = [...new Set(offers.flatMap(rows => rows.map(h => h.s)))].sort();
+  const build = allowed => {
+    const picks = offers.map(rows => rows.filter(h => allowed.includes(h.s))
+      .sort((a,b)=>Math.round(a.total/EUR*100)-Math.round(b.total/EUR*100) || a.s.localeCompare(b.s))[0]);
+    if (picks.some(h => !h)) return null;
+    return {stores:[...new Set(picks.map(h => h.s))].sort(), total:EUR*picks.reduce((sum,h)=>sum+Math.round(h.total/EUR*100),0)/100,
+      picks:items.map((item,i)=>({item,...picks[i]}))};
+  };
+  const better = (a,b) => !b || a.total < b.total || (a.total === b.total && a.stores.length < b.stores.length);
+  let single=null,pair=null;
+  for (const store of stores) { const p=build([store]); if(p && better(p,single)) single=p; }
+  for (let i=0;i<stores.length;i++) for(let j=i+1;j<stores.length;j++) {
+    const p=build([stores[i],stores[j]]); if(p && p.stores.length===2 && better(p,pair)) pair=p;
+  }
+  // Never advertise a partial total as a saving, or a second visit on a tie.
+  if (single && pair && pair.total >= single.total) pair=null;
+  return {single,pair,saving:single && pair ? EUR*(Math.round(single.total/EUR*100)-Math.round(pair.total/EUR*100))/100 : null};
+}
+function basketPlanHtml() {
+  if (!S.perItem || !S.list.length) return '';
+  const p=planBasket(S.list,S.perItem);
+  const pricePlan = plan => `${eur(plan.total)} € · ${plan.stores.map(esc).join(' + ')}`;
+  return `<section class="panel" aria-label="Умна кошница"><h3>Един магазин или два?</h3>
+    <p><b>Един:</b> ${p.single ? pricePlan(p.single) : 'Няма пълна кошница с известни цени в една верига.'}</p>
+    <p><b>До два:</b> ${p.pair ? pricePlan(p.pair) : p.single ? 'Втори магазин не намалява сумата.' : 'Няма пълна комбинация в два магазина.'}</p>
+    ${p.saving != null ? `<p class="pill mintf">Още ${eur(p.saving)} € по-ниска стойност на продуктите</p>` : ''}
+    <p class="note">Само при пълно покритие на списъка. Марките може да са различни; провери избраните опаковки. Не включва транспорт, време или потвърдена наличност.</p>
+    ${p.pair ? `<details><summary>Какво да купя от всеки магазин?</summary>${p.pair.stores.map(store => `<h4>${esc(store)}${Number.isFinite(S.geoKm?.[store]) ? ' · ≈ '+fmtKm(S.geoKm[store])+' от теб по права линия' : ''}</h4>${p.pair.picks.filter(h => h.s===store).map(h=>`<p>${esc(h.item)} → ${esc(h.n || h.item)}<br><small>${h.packs} опак. · ${eur(h.total)} €</small></p>`).join('')}`).join('')}</details>` : ''}</section>`;
+}
 function viewList() {
   const items = S.list;
-  let html = nearbyControls() + `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
+  let html = dataNotice() + nearbyControls() + `<div class="note">Напиши какво ще купуваш — сметката показва в коя верига излиза най-евтино, по официалните цени и промоциите.</div>
   <div class="addrow"><input id="newitem" aria-label="Добави продукт в списъка" placeholder="напр. „мляко“, „яйца“, „кайма“" value="${esc(S.nq || "")}"><button data-act="add:">Добави</button></div>`;
 
   // Подсказки, докато пишеш — същото преживяване като търсенето в Днес:
@@ -1912,6 +2045,7 @@ function viewList() {
      <button class="big" data-act="week:">Добави типична седмична кошница</button>`;
 
   html += `<button class="big" data-act="rank:">🧮 Къде е най-евтино?</button>`;
+  html += basketPlanHtml();
   if (S.ranking && !S.ranking.length && S.nearOnly && !S.geoBusy && !S.geoError)
     html += `<div class="note">Няма сравними цени от известни обекти до ${S.nearRadius} км. Увеличи радиуса или изключи „Само наблизо“. Магазини без координати и онлайн магазини са изключени.</div>`;
 
@@ -2068,8 +2202,8 @@ function comparableRows(item) {
 }
 
 async function rankInner(version) {
-  if (!S.search) S.search = (await loadSearch()) || [];
-  if (version !== rankVersion) return;
+  if (!S.search?.length) await loadSearch();
+  if (version !== rankVersion || !S.search?.length) return;
   const per = {}, mode = {}, totals = new Map();
   for (const item of S.list) {
     const result = comparableRows(item);
@@ -2347,12 +2481,13 @@ function openDetail(ref, push = true) {
   </div>`;
 
   if (S.search) {
-    const [candidates, kw] = S.cmpStrict ? [catalogueMatches(name),"каталог, марка и разфасовка"] : compareQuery(name, false);
+    const sameCode = catalogueGtin(base);
+    const [candidates, kw] = S.cmpStrict ? [catalogueMatches(name,base),sameCode ? "баркод от източника" : "каталог, марка и разфасовка"] : compareQuery(name, false);
     const ev = sortResults(candidates,"price");
     const modeBtns = `<div class="chips" style="margin:6px 0">
       <button class="chip ${S.cmpStrict ? "" : "on"}" data-cmpmode="0">Алтернативи</button>
       <button class="chip ${S.cmpStrict ? "on" : ""}" data-cmpmode="1">Съвпадение по каталог</button></div>
-      <div class="note">${S.cmpStrict ? "Съвпадат каталожно име, марка и разфасовка. Не е потвърждение по баркод. Условните цени с карта са изключени." : "Възможни алтернативи, не същият продукт. Марките и количествата може да се различават."} Показаните предложения са подредени по цена за опаковка.</div>`;
+      <div class="note">${S.cmpStrict ? (sameCode ? "Съвпада баркодът, подаден от източника, с валидна контролна цифра. Не е проверка в регистър или на рафта. Цените с карта са изключени." : "Съвпадат каталожно име, марка и разфасовка. Не е потвърждение по баркод. Условните цени с карта са изключени.") : "Възможни алтернативи, не същият продукт. Марките и количествата може да се различават."} Показаните предложения са подредени по цена за опаковка.</div>`;
     if (ev.length >= 2) {
       const lo = Math.min(...ev.map(h => h.p)), hi = Math.max(...ev.map(h => h.p));
       html += `<h3>Цените навсякъде</h3>${modeBtns}
@@ -2405,6 +2540,8 @@ function openDetail(ref, push = true) {
   {
     if (S.reported[repKey]) {
       repHtml = `<div class="panel" style="grid-column:1/-1;width:100%;min-width:0"><div class="note">Сигналът е записан само на това устройство. Не е изпратен автоматично.</div>
+        <a class="btn" href="${esc(reportEmail(S.reported[repKey]))}">Подготви имейл до разработчика</a>
+        <div class="note">До Valeri.Milanov@aisolutions.bg. Отваря твоята поща; ти преглеждаш и изпращаш. Получателят вижда имейла ти. Не е потвърждение за получен сигнал.</div>
         <button class="btn" data-repshare="${esc(repKey)}">Сподели сигнала</button>
         <details><summary>Текст за ръчно копиране</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(reportText(S.reported[repKey]))}</pre></details>
         <button class="btn ghost" data-repremove="${esc(repKey)}">Изтрий локалния сигнал</button></div>`;
@@ -2432,6 +2569,12 @@ function openDetail(ref, push = true) {
     <button class="btn" data-share="${esc(name)}|${eur(price)} €|${esc(store)}${pct ? "|" + pct : ""}">📤 Сподели</button>
     <button class="btn ghost" data-close>Затвори</button>
   </div>`;
+
+  html += `<details class="panel"><summary>Следене с ценови праг</summary>
+    <p class="note">Следи „${esc(kw)}“ до избрана цена за опаковка. Различни марки и разфасовки може да съвпадат — провери продукта. Цени с карта са изключени. В сайта проверката става при отваряне.</p>
+    <label>Максимална цена (€) <input id="watchmax" inputmode="decimal" aria-label="Максимална цена за следене в евро" value="${esc(String(S.watchDraft?.[kw] ?? S.watchTargets[kw] ?? ''))}" data-watchdraft="${esc(kw)}" placeholder="например 6,00"></label>
+    <div id="watcherror" role="alert"></div><button class="btn" data-savewatch="${esc(kw)}">Запази следенето</button>
+    <p class="note">Празно поле = следене на намаления без ценови праг.</p></details>`;
 
   if (!S.history && !S.histPending) {
     // Първото отваряне на продукт тегли историята и пре-рисува листа.
@@ -2519,7 +2662,7 @@ function bind() {
     ni.oninput = async () => {
       S.nq = ni.value;
       if (S.nq.trim().length >= 2 && !S.search)
-        S.search = await loadSearch();
+        await loadSearch();
       renderKeepFocus("newitem");
     };
   }
@@ -2555,7 +2698,13 @@ document.addEventListener("change", e => {
       !["кг","л","бр"].includes(amount.unit)) { e.target.value = previous.quantity; return; }
   S.amounts.set(item, amount); listChanged();
 });
+document.addEventListener("input", e => {
+  if (e.target.dataset.watchdraft) {
+    S.watchDraft ||= {}; S.watchDraft[e.target.dataset.watchdraft] = e.target.value;
+  }
+});
 document.addEventListener("click", e => {
+  if (e.target.closest("[data-refresh]")) { refreshData(); return; }
   const radius = e.target.closest("[data-radius]");
   if (radius) { const r = Number(radius.dataset.radius); if ([5,10,20,50].includes(r)) { S.nearRadius = r; write("pr_radius", String(r)); listChanged(); } return; }
   const sort = e.target.closest("[data-basketsort]");
@@ -2601,6 +2750,21 @@ document.addEventListener("click", e => {
   const al = e.target.closest("[data-addlist]");
   if (al) { addItem(al.dataset.addlist); closeDetail(); return; }
   if (e.target.closest("[data-reload]")) { location.reload(); return; }
+  const targetWatch = e.target.closest("[data-savewatch]");
+  if (targetWatch) {
+    const kw = targetWatch.dataset.savewatch, value = $("watchmax").value.trim();
+    const target = value ? watchTargetPrice(value) : null;
+    if (value && target == null) { $("watcherror").textContent = "Въведи цена от 0,01 до 4999,99 € с най-много две цифри след запетаята."; return; }
+    const targets = {...S.watchTargets}; if (target == null) delete targets[kw]; else targets[kw] = target;
+    const watches = S.watch.includes(kw) ? S.watch : [...S.watch,kw];
+    try { localStorage.setItem("pr_targets",JSON.stringify(Object.entries(targets))); localStorage.setItem("pr_watch",JSON.stringify(watches)); }
+    catch (_) { $("watcherror").textContent = "Не успях да запазя. Разреши локалното съхранение."; return; }
+    S.watchTargets = targets; S.watch = watches;
+    document.querySelectorAll('[data-watch]').forEach(button => {
+      if (button.dataset.watch === kw) button.textContent = '🔕 Спри следенето';
+    });
+    $("watcherror").textContent = "Запазено на това устройство."; return;
+  }
   const w = e.target.closest("[data-watch]");
   if (w) {
     const kw = w.dataset.watch;
@@ -2681,8 +2845,8 @@ document.addEventListener("click", e => {
     else { navigator.clipboard?.writeText(txt); sh.textContent = "✓ Копирано"; }
     return;
   }
-  const nav = e.target.closest(".nav button");
-  if (nav) { S.tab = nav.dataset.tab; S.limit = 120; render(); if (S.tab === "list" && S.list.length && !S.ranking && !S.busy) rank(); return; }
+  const nav = e.target.closest("[data-tab]");
+  if (nav && ['today','list','more'].includes(nav.dataset.tab)) { S.tab = nav.dataset.tab; S.limit = 120; render(); if (S.tab === "list" && S.list.length && !S.ranking && !S.busy) rank(); return; }
   const act = e.target.closest("[data-act]");
   if (!act) return;
   const [cmd, arg] = act.dataset.act.split(/:(.*)/);
